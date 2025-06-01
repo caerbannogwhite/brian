@@ -468,17 +468,22 @@ export class SpreadsheetVisualizer {
 
   private getCellAtPosition(x: number, y: number): CellPosition | null {
     const { headerHeight, cellHeight } = this.options;
+    const scrollbarWidth = this.needsVerticalScrollbar() ? this.scrollbarWidth : 0;
+
+    // Adjust x for horizontal scroll
+    const adjustedX = x + this.scrollX;
 
     // Check if click is in header row
     if (y < headerHeight) {
-      const col = this.getColumnAtX(x);
+      const col = this.getColumnAtX(adjustedX);
       return col !== null ? { row: -1, col } : null;
     }
 
     // Check if click is in data rows
-    const row = Math.floor((y - headerHeight) / cellHeight);
+    const adjustedY = y + this.scrollY;
+    const row = Math.floor((adjustedY - headerHeight) / cellHeight);
     if (row >= 0 && row < this.totalRows) {
-      const col = this.getColumnAtX(x);
+      const col = this.getColumnAtX(adjustedX);
       return col !== null ? { row, col } : null;
     }
 
@@ -630,24 +635,33 @@ export class SpreadsheetVisualizer {
     const endCol = Math.max(this.selectionStart.col, this.selectionEnd.col);
 
     const { headerHeight, cellHeight } = this.options;
+    const visibleWidth = this.needsVerticalScrollbar() ? this.canvas.width - this.scrollbarWidth : this.canvas.width;
+    const visibleHeight = this.needsHorizontalScrollbar() ? this.canvas.height - this.scrollbarWidth : this.canvas.height;
 
     // Draw selection rectangles
     for (let row = startRow; row <= endRow; row++) {
-      const y = row === -1 ? 0 : headerHeight + row * cellHeight;
+      const rowY = row === -1 ? 0 : headerHeight + (row * cellHeight) - this.scrollY;
+      
+      // Skip if row is not visible
+      if (rowY + cellHeight < 0 || rowY > visibleHeight) continue;
+
       const height = row === -1 ? headerHeight : cellHeight;
 
       for (let col = startCol; col <= endCol; col++) {
-        const x = this.getColumnX(col);
-        const width = this.columnWidths[col];
+        const x = this.getColumnX(col) - this.scrollX;
+        const width = col === -1 ? this.rowIndexWidth : this.columnWidths[col];
+
+        // Skip if column is not visible
+        if (x + width < 0 || x > visibleWidth) continue;
 
         // Draw selection background
         this.ctx.fillStyle = this.selectionColor;
-        this.ctx.fillRect(x, y, width, height);
+        this.ctx.fillRect(x, rowY, width, height);
 
         // Draw selection border
         this.ctx.strokeStyle = this.selectionBorderColor;
         this.ctx.lineWidth = 1;
-        this.ctx.strokeRect(x, y, width, height);
+        this.ctx.strokeRect(x, rowY, width, height);
       }
     }
   }
@@ -657,23 +671,28 @@ export class SpreadsheetVisualizer {
 
     const { headerHeight, cellHeight } = this.options;
     const { row, col } = this.hoverCell;
+    const visibleWidth = this.needsVerticalScrollbar() ? this.canvas.width - this.scrollbarWidth : this.canvas.width;
+    const visibleHeight = this.needsHorizontalScrollbar() ? this.canvas.height - this.scrollbarWidth : this.canvas.height;
 
     // Don't draw hover if cell is selected
     if (this.isCellSelected(this.hoverCell)) return;
 
-    const y = row === -1 ? 0 : headerHeight + row * cellHeight;
+    const rowY = row === -1 ? 0 : headerHeight + (row * cellHeight) - this.scrollY;
     const height = row === -1 ? headerHeight : cellHeight;
-    const x = this.getColumnX(col);
-    const width = this.columnWidths[col];
+    const x = this.getColumnX(col) - this.scrollX;
+    const width = col === -1 ? this.rowIndexWidth : this.columnWidths[col];
+
+    // Skip if cell is not visible
+    if (rowY + height < 0 || rowY > visibleHeight || x + width < 0 || x > visibleWidth) return;
 
     // Draw hover background
     this.ctx.fillStyle = this.hoverColor;
-    this.ctx.fillRect(x, y, width, height);
+    this.ctx.fillRect(x, rowY, width, height);
 
     // Draw hover border
     this.ctx.strokeStyle = this.hoverBorderColor;
     this.ctx.lineWidth = 1;
-    this.ctx.strokeRect(x, y, width, height);
+    this.ctx.strokeRect(x, rowY, width, height);
   }
 
   private drawCell(x: number, y: number, width: number, height: number, text: string, style: CellStyle): void {
