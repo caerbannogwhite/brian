@@ -47,6 +47,11 @@ export class SpreadsheetVisualizer {
   private selectionColor: string = "rgba(0, 120, 212, 0.2)";
   private selectionBorderColor: string = "rgb(0, 120, 212)";
 
+  // Hover state
+  private hoverCell: CellPosition | null = null;
+  private hoverColor: string = "rgba(0, 120, 212, 0.1)";
+  private hoverBorderColor: string = "rgba(0, 120, 212, 0.5)";
+
   constructor(canvas: HTMLCanvasElement, columns: Column[], data: any[], options: Partial<SpreadsheetOptions> = {}) {
     this.canvas = canvas;
     this.ctx = canvas.getContext("2d")!;
@@ -93,11 +98,11 @@ export class SpreadsheetVisualizer {
   private setupEventListeners(): void {
     window.addEventListener("resize", () => this.resize());
 
-    // Mouse events for selection
+    // Mouse events for selection and hover
     this.canvas.addEventListener("mousedown", this.handleMouseDown.bind(this));
     this.canvas.addEventListener("mousemove", this.handleMouseMove.bind(this));
     this.canvas.addEventListener("mouseup", this.handleMouseUp.bind(this));
-    this.canvas.addEventListener("mouseleave", this.handleMouseUp.bind(this));
+    this.canvas.addEventListener("mouseleave", this.handleMouseLeave.bind(this));
 
     // Keyboard events for copy
     document.addEventListener("keydown", this.handleKeyDown.bind(this));
@@ -189,6 +194,12 @@ export class SpreadsheetVisualizer {
     return x;
   }
 
+  private handleMouseLeave(): void {
+    this.isSelecting = false;
+    this.hoverCell = null;
+    this.draw();
+  }
+
   private handleMouseDown(e: MouseEvent): void {
     const rect = this.canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
@@ -196,22 +207,34 @@ export class SpreadsheetVisualizer {
     
     const cell = this.getCellAtPosition(x, y);
     if (cell) {
-      this.isSelecting = true;
-      this.selectionStart = cell;
-      this.selectionEnd = cell;
+      // If clicking on a selected cell, deselect
+      if (this.isCellSelected(cell)) {
+        this.selectionStart = null;
+        this.selectionEnd = null;
+      } else {
+        this.isSelecting = true;
+        this.selectionStart = cell;
+        this.selectionEnd = cell;
+      }
       this.draw();
     }
   }
 
   private handleMouseMove(e: MouseEvent): void {
-    if (!this.isSelecting || !this.selectionStart) return;
-
     const rect = this.canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
     
     const cell = this.getCellAtPosition(x, y);
-    if (cell) {
+    
+    // Update hover state
+    if (this.hoverCell?.row !== cell?.row || this.hoverCell?.col !== cell?.col) {
+      this.hoverCell = cell;
+      this.draw();
+    }
+
+    // Update selection if dragging
+    if (this.isSelecting && this.selectionStart && cell) {
       this.selectionEnd = cell;
       this.draw();
     }
@@ -304,6 +327,30 @@ export class SpreadsheetVisualizer {
     }
   }
 
+  private drawHover(): void {
+    if (!this.hoverCell) return;
+
+    const { headerHeight, cellHeight } = this.options;
+    const { row, col } = this.hoverCell;
+
+    // Don't draw hover if cell is selected
+    if (this.isCellSelected(this.hoverCell)) return;
+
+    const y = row === -1 ? 0 : headerHeight + row * cellHeight;
+    const height = row === -1 ? headerHeight : cellHeight;
+    const x = this.getColumnX(col);
+    const width = col === -1 ? this.rowIndexWidth : this.columnWidths[col];
+
+    // Draw hover background
+    this.ctx.fillStyle = this.hoverColor;
+    this.ctx.fillRect(x, y, width, height);
+
+    // Draw hover border
+    this.ctx.strokeStyle = this.hoverBorderColor;
+    this.ctx.lineWidth = 1;
+    this.ctx.strokeRect(x, y, width, height);
+  }
+
   private draw(): void {
     const { ctx, canvas, columns, data, options } = this;
     const { cellHeight, headerHeight, borderColor, borderWidth, rowIndexStyle } = options;
@@ -343,8 +390,11 @@ export class SpreadsheetVisualizer {
       });
     });
 
-    // Draw selection on top
+    // Draw selection
     this.drawSelection();
+
+    // Draw hover on top
+    this.drawHover();
   }
 
   private drawCell(x: number, y: number, width: number, height: number, text: string, style: CellStyle): void {
@@ -383,5 +433,17 @@ export class SpreadsheetVisualizer {
     const textY = y + (height + (style.fontSize || 14)) / 2;
     ctx.fillText(text, textX, textY);
     ctx.restore();
+  }
+
+  private isCellSelected(cell: CellPosition): boolean {
+    if (!this.selectionStart || !this.selectionEnd) return false;
+
+    const startRow = Math.min(this.selectionStart.row, this.selectionEnd.row);
+    const endRow = Math.max(this.selectionStart.row, this.selectionEnd.row);
+    const startCol = Math.min(this.selectionStart.col, this.selectionEnd.col);
+    const endCol = Math.max(this.selectionStart.col, this.selectionEnd.col);
+
+    return cell.row >= startRow && cell.row <= endRow &&
+           cell.col >= startCol && cell.col <= endCol;
   }
 } 
