@@ -2,7 +2,9 @@ export interface Column {
   header: string;
   key: string;
   width?: number;
-  type: "string" | "number" | "date";
+  label?: string;
+  format?: string;
+  dataType: "string" | "integer" | "decimal" | "date" | "datetime" | "boolean";
 }
 
 export interface CellStyle {
@@ -116,20 +118,20 @@ export class SpreadsheetVisualizer {
 
   private calculateColumnWidths(): void {
     const { headerStyle, defaultCellStyle } = this.options;
-    
+
     // Calculate widths based on content
     this.columnWidths = this.columns.map((column, colIndex) => {
       // Measure header width
       const headerWidth = this.measureText(column.header, headerStyle);
-      
+
       // Measure data widths
       const maxDataWidth = Math.max(
-        ...this.data.map(row => {
-          const value = row[column.key]?.toString() ?? "";
+        ...this.data.map((row) => {
+          const value = row[colIndex]?.toString() ?? "";
           return this.measureText(value, defaultCellStyle);
         })
       );
-      
+
       // Use the larger of header width and max data width, but not less than minCellWidth
       return Math.max(headerWidth, maxDataWidth, this.minCellWidth);
     });
@@ -144,7 +146,7 @@ export class SpreadsheetVisualizer {
 
   private getCellAtPosition(x: number, y: number): CellPosition | null {
     const { headerHeight, cellHeight } = this.options;
-    
+
     // Check if click is in header row
     if (y < headerHeight) {
       const col = this.getColumnAtX(x);
@@ -163,7 +165,7 @@ export class SpreadsheetVisualizer {
 
   private getColumnAtX(x: number): number | null {
     let currentX = 0;
-    
+
     // Check row index column
     if (x < this.rowIndexWidth) {
       return -1; // Row index column
@@ -204,7 +206,7 @@ export class SpreadsheetVisualizer {
     const rect = this.canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
-    
+
     const cell = this.getCellAtPosition(x, y);
     if (cell) {
       // If clicking on a selected cell, deselect
@@ -224,9 +226,9 @@ export class SpreadsheetVisualizer {
     const rect = this.canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
-    
+
     const cell = this.getCellAtPosition(x, y);
-    
+
     // Update hover state
     if (this.hoverCell?.row !== cell?.row || this.hoverCell?.col !== cell?.col) {
       this.hoverCell = cell;
@@ -246,7 +248,7 @@ export class SpreadsheetVisualizer {
 
   private handleKeyDown(e: KeyboardEvent): void {
     // Handle Ctrl+C or Cmd+C
-    if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
+    if ((e.ctrlKey || e.metaKey) && e.key === "c") {
       this.copySelection();
     }
   }
@@ -260,7 +262,7 @@ export class SpreadsheetVisualizer {
     const endCol = Math.max(this.selectionStart.col, this.selectionEnd.col);
 
     const rows: string[] = [];
-    
+
     // Add header row if selected
     if (startRow === -1) {
       const headerCells: string[] = [];
@@ -289,11 +291,14 @@ export class SpreadsheetVisualizer {
     }
 
     const text = rows.join("\n");
-    navigator.clipboard.writeText(text).then(() => {
-      console.log("Selection copied to clipboard");
-    }).catch(err => {
-      console.error("Failed to copy selection:", err);
-    });
+    navigator.clipboard
+      .writeText(text)
+      .then(() => {
+        console.log("Selection copied to clipboard");
+      })
+      .catch((err) => {
+        console.error("Failed to copy selection:", err);
+      });
   }
 
   private drawSelection(): void {
@@ -360,7 +365,7 @@ export class SpreadsheetVisualizer {
 
     // Draw header starting from the left edge
     let currentX = 0;
-    
+
     // Draw row index header
     this.drawCell(currentX, 0, this.rowIndexWidth, headerHeight, "#", rowIndexStyle);
     currentX += this.rowIndexWidth;
@@ -384,7 +389,7 @@ export class SpreadsheetVisualizer {
       // Draw data cells
       columns.forEach((column, index) => {
         const width = this.columnWidths[index];
-        const value = row[column.key]?.toString() ?? "";
+        const value = row[index]?.toString() ?? "";
         this.drawCell(currentX, rowY, width, cellHeight, value, options.defaultCellStyle);
         currentX += width;
       });
@@ -443,7 +448,6 @@ export class SpreadsheetVisualizer {
     const startCol = Math.min(this.selectionStart.col, this.selectionEnd.col);
     const endCol = Math.max(this.selectionStart.col, this.selectionEnd.col);
 
-    return cell.row >= startRow && cell.row <= endRow &&
-           cell.col >= startCol && cell.col <= endCol;
+    return cell.row >= startRow && cell.row <= endRow && cell.col >= startCol && cell.col <= endCol;
   }
-} 
+}

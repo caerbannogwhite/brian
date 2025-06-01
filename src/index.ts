@@ -1,3 +1,5 @@
+import { datasetDm, type CdiscDataset } from "./data.ts";
+import { getColumns } from "./data.ts";
 import type { Column } from "./SpreadsheetVisualizer.ts";
 import { SpreadsheetVisualizer } from "./SpreadsheetVisualizer.ts";
 
@@ -33,22 +35,9 @@ document.addEventListener("DOMContentLoaded", () => {
     `;
 
     // Sample data and initialization
-    const columns: Column[] = [
-      { header: "ID", key: "id", type: "number" },
-      { header: "Name", key: "name", type: "string" },
-      { header: "Age", key: "age", type: "number" },
-      { header: "Email", key: "email", type: "string" },
-      { header: "Status", key: "status", type: "string" },
-    ];
+    const columns: Column[] = getColumns(datasetDm as CdiscDataset);
 
-    const data: any[] = [
-      { id: 1, name: "John Doe", age: 30, email: "john@example.com", status: "Active" },
-      { id: 2, name: "Jane Smith", age: 25, email: "jane@example.com", status: "Inactive" },
-      { id: 3, name: "Bob Johnson", age: 35, email: "bob@example.com", status: "Active" },
-      { id: 4, name: "Alice Brown", age: 28, email: "alice@example.com", status: "Pending" },
-      { id: 5, name: "Charlie Wilson", age: 32, email: "charlie@example.com", status: "Active" },
-      { id: 6, name: "Massimo M", age: 31, email: "massimo@example.com", status: "Active" },
-    ];
+    const data: any[] = datasetDm.rows;
 
     const canvas = document.getElementById("spreadsheet") as HTMLCanvasElement;
     const visualizer = new SpreadsheetVisualizer(canvas, columns, data, {
