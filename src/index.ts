@@ -34,11 +34,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Sample data and initialization
     const columns: Column[] = [
-      { header: "ID", key: "id", width: 80, type: "number" },
-      { header: "Name", key: "name", width: 150, type: "string" },
-      { header: "Age", key: "age", width: 80, type: "number" },
-      { header: "Email", key: "email", width: 200, type: "string" },
-      { header: "Status", key: "status", width: 100, type: "string" },
+      { header: "ID", key: "id", type: "number" },
+      { header: "Name", key: "name", type: "string" },
+      { header: "Age", key: "age", type: "number" },
+      { header: "Email", key: "email", type: "string" },
+      { header: "Status", key: "status", type: "string" },
     ];
 
     const data: any[] = [
