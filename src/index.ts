@@ -34,13 +34,18 @@ document.addEventListener("DOMContentLoaded", () => {
       </div>
     `;
 
-    // Sample data and initialization
     const columns: Column[] = getColumns(datasetDm as CdiscDataset);
 
-    const data: any[] = datasetDm.rows;
+    const dataProvider = {
+      fetchData: async (startRow: number, endRow: number, startColumn: number, endColumn: number) => {
+        return datasetDm.rows.slice(startRow, endRow).map((row) => row.slice(startColumn, endColumn));
+      },
+      getTotalRows: async () => datasetDm.rows.length,
+      getTotalColumns: async () => datasetDm.columns.length,
+    };
 
     const canvas = document.getElementById("spreadsheet") as HTMLCanvasElement;
-    const visualizer = new SpreadsheetVisualizer(canvas, columns, data, {
+    const visualizer = new SpreadsheetVisualizer(canvas, columns, dataProvider, {
       cellHeight: 35,
       headerHeight: 45,
       defaultCellStyle: {

@@ -24,6 +24,14 @@ export interface SpreadsheetOptions {
   rowIndexStyle: CellStyle;
   borderColor: string;
   borderWidth: number;
+  initialRowCount?: number; // Number of rows to fetch initially
+  rowBuffer?: number; // Number of rows to keep in buffer
+}
+
+export interface DataProvider {
+  fetchData(startRow: number, endRow: number, startCol: number, endCol: number): Promise<any[][]>;
+  getTotalRows(): Promise<number>;
+  getTotalColumns(): Promise<number>;
 }
 
 interface CellPosition {
@@ -35,7 +43,7 @@ export class SpreadsheetVisualizer {
   private canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D;
   private columns: Column[];
-  private data: any[];
+  private dataProvider: DataProvider;
   private options: SpreadsheetOptions;
   private columnWidths: number[] = [];
   private minCellWidth: number = 100; // Minimum width for a cell
@@ -54,11 +62,29 @@ export class SpreadsheetVisualizer {
   private hoverColor: string = "rgba(0, 120, 212, 0.1)";
   private hoverBorderColor: string = "rgba(0, 120, 212, 0.5)";
 
-  constructor(canvas: HTMLCanvasElement, columns: Column[], data: any[], options: Partial<SpreadsheetOptions> = {}) {
+  // Scrolling state
+  private scrollY: number = 0;
+  private scrollX: number = 0;
+  private totalRows: number = 0;
+  private totalColumns: number = 0;
+  private visibleRows: number = 0;
+  private visibleColumns: number = 0;
+  private rowBuffer: number = 20; // Number of rows to keep in buffer
+  private dataCache: Map<number, any[]> = new Map(); // Cache for fetched rows
+  private isFetching: boolean = false;
+  private lastFetchStart: number = 0;
+  private lastFetchEnd: number = 0;
+
+  constructor(
+    canvas: HTMLCanvasElement,
+    columns: Column[],
+    dataProvider: DataProvider,
+    options: Partial<SpreadsheetOptions> = {}
+  ) {
     this.canvas = canvas;
     this.ctx = canvas.getContext("2d")!;
     this.columns = columns;
-    this.data = data;
+    this.dataProvider = dataProvider;
 
     // Default options
     this.options = {
@@ -90,15 +116,100 @@ export class SpreadsheetVisualizer {
       },
       borderColor: "#e0e0e0",
       borderWidth: 1,
+      initialRowCount: 100,
+      rowBuffer: 20,
       ...options,
     };
 
+    this.rowBuffer = this.options.rowBuffer || 20;
     this.setupEventListeners();
-    this.resize();
+    this.initialize();
+  }
+
+  private async initialize(): Promise<void> {
+    try {
+      // Get total rows and columns
+      this.totalRows = await this.dataProvider.getTotalRows();
+      this.totalColumns = await this.dataProvider.getTotalColumns();
+
+      // Calculate initial visible rows and columns
+      this.calculateVisibleCells();
+
+      // Calculate column widths
+      await this.calculateColumnWidths();
+
+      // Fetch initial data
+      await this.fetchVisibleData();
+
+      // Draw the initial view
+      this.draw();
+    } catch (error) {
+      console.error("Error initializing spreadsheet:", error);
+    }
+  }
+
+  private calculateVisibleCells(): void {
+    const { cellHeight, headerHeight } = this.options;
+    const canvasHeight = this.canvas.height - headerHeight;
+    const canvasWidth = this.canvas.width - this.rowIndexWidth;
+
+    this.visibleRows = Math.ceil(canvasHeight / cellHeight) + this.rowBuffer;
+    this.visibleColumns = this.columns.length;
+  }
+
+  private async fetchVisibleData(): Promise<void> {
+    if (this.isFetching) return;
+
+    const startRow = Math.max(0, Math.floor(this.scrollY / this.options.cellHeight));
+    const endRow = Math.min(
+      this.totalRows,
+      startRow + this.visibleRows
+    );
+
+    // Don't fetch if we already have this range
+    if (startRow === this.lastFetchStart && endRow === this.lastFetchEnd) {
+      return;
+    }
+
+    this.isFetching = true;
+    try {
+      const data = await this.dataProvider.fetchData(
+        startRow,
+        endRow,
+        0,
+        this.totalColumns - 1
+      );
+
+      // Update cache
+      data.forEach((row, index) => {
+        this.dataCache.set(startRow + index, row);
+      });
+
+      // Remove rows outside buffer
+      const bufferStart = Math.max(0, startRow - this.rowBuffer);
+      const bufferEnd = endRow + this.rowBuffer;
+      for (const [rowIndex] of this.dataCache) {
+        if (rowIndex < bufferStart || rowIndex >= bufferEnd) {
+          this.dataCache.delete(rowIndex);
+        }
+      }
+
+      this.lastFetchStart = startRow;
+      this.lastFetchEnd = endRow;
+      this.draw();
+    } catch (error) {
+      console.error("Error fetching data:", error);
+    } finally {
+      this.isFetching = false;
+    }
   }
 
   private setupEventListeners(): void {
-    window.addEventListener("resize", () => this.resize());
+    window.addEventListener("resize", () => {
+      this.calculateVisibleCells();
+      this.fetchVisibleData();
+      this.draw();
+    });
 
     // Mouse events for selection and hover
     this.canvas.addEventListener("mousedown", this.handleMouseDown.bind(this));
@@ -106,8 +217,149 @@ export class SpreadsheetVisualizer {
     this.canvas.addEventListener("mouseup", this.handleMouseUp.bind(this));
     this.canvas.addEventListener("mouseleave", this.handleMouseLeave.bind(this));
 
-    // Keyboard events for copy
+    // Scroll events
+    this.canvas.addEventListener("wheel", this.handleWheel.bind(this));
+
+    // Keyboard events for copy and navigation
     document.addEventListener("keydown", this.handleKeyDown.bind(this));
+  }
+
+  private handleWheel(e: WheelEvent): void {
+    e.preventDefault();
+
+    const { cellHeight } = this.options;
+    const deltaY = e.deltaY;
+    const deltaX = e.deltaX;
+
+    // Vertical scroll
+    if (deltaY !== 0) {
+      const newScrollY = Math.max(0, this.scrollY + deltaY);
+      const maxScrollY = Math.max(0, (this.totalRows * cellHeight) - this.canvas.height);
+      this.scrollY = Math.min(newScrollY, maxScrollY);
+    }
+
+    // Horizontal scroll
+    if (deltaX !== 0) {
+      const totalWidth = this.columnWidths.reduce((sum, width) => sum + width, 0) + this.rowIndexWidth;
+      const newScrollX = Math.max(0, this.scrollX + deltaX);
+      const maxScrollX = Math.max(0, totalWidth - this.canvas.width);
+      this.scrollX = Math.min(newScrollX, maxScrollX);
+    }
+
+    this.fetchVisibleData();
+    this.draw();
+  }
+
+  private handleKeyDown(e: KeyboardEvent): void {
+    // Handle Ctrl+C or Cmd+C
+    if ((e.ctrlKey || e.metaKey) && e.key === "c") {
+      this.copySelection().catch(console.error);
+      return;
+    }
+
+    // Handle arrow keys for navigation
+    const { cellHeight } = this.options;
+    let newScrollY = this.scrollY;
+    let newScrollX = this.scrollX;
+
+    switch (e.key) {
+      case "ArrowUp":
+        newScrollY = Math.max(0, this.scrollY - cellHeight);
+        break;
+      case "ArrowDown":
+        newScrollY = Math.min(
+          (this.totalRows * cellHeight) - this.canvas.height,
+          this.scrollY + cellHeight
+        );
+        break;
+      case "ArrowLeft":
+        newScrollX = Math.max(0, this.scrollX - 50);
+        break;
+      case "ArrowRight":
+        newScrollX = Math.min(
+          this.columnWidths.reduce((sum, width) => sum + width, 0) - this.canvas.width,
+          this.scrollX + 50
+        );
+        break;
+      case "PageUp":
+        newScrollY = Math.max(0, this.scrollY - this.canvas.height);
+        break;
+      case "PageDown":
+        newScrollY = Math.min(
+          (this.totalRows * cellHeight) - this.canvas.height,
+          this.scrollY + this.canvas.height
+        );
+        break;
+      case "Home":
+        newScrollY = 0;
+        break;
+      case "End":
+        newScrollY = (this.totalRows * cellHeight) - this.canvas.height;
+        break;
+      default:
+        return;
+    }
+
+    if (newScrollY !== this.scrollY || newScrollX !== this.scrollX) {
+      this.scrollY = newScrollY;
+      this.scrollX = newScrollX;
+      this.fetchVisibleData();
+      this.draw();
+    }
+  }
+
+  private draw(): void {
+    const { ctx, canvas, columns, options } = this;
+    const { cellHeight, headerHeight, borderColor, borderWidth, rowIndexStyle } = options;
+
+    // Clear canvas
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Calculate visible range
+    const startRow = Math.floor(this.scrollY / cellHeight);
+    const visibleRowCount = Math.ceil(canvas.height / cellHeight);
+    const endRow = Math.min(this.totalRows, startRow + visibleRowCount + this.rowBuffer);
+
+    // Draw header (fixed)
+    let currentX = -this.scrollX;
+    
+    // Draw row index header
+    this.drawCell(currentX, 0, this.rowIndexWidth, headerHeight, "#", rowIndexStyle);
+    currentX += this.rowIndexWidth;
+
+    // Draw column headers
+    columns.forEach((column, index) => {
+      const width = this.columnWidths[index];
+      this.drawCell(currentX, 0, width, headerHeight, column.header, options.headerStyle);
+      currentX += width;
+    });
+
+    // Draw data rows
+    for (let rowIndex = startRow; rowIndex < endRow; rowIndex++) {
+      currentX = -this.scrollX;
+      const rowY = headerHeight + (rowIndex * cellHeight) - this.scrollY;
+
+      // Draw row index
+      this.drawCell(currentX, rowY, this.rowIndexWidth, cellHeight, (rowIndex + 1).toString(), rowIndexStyle);
+      currentX += this.rowIndexWidth;
+
+      // Draw data cells
+      const rowData = this.dataCache.get(rowIndex);
+      if (rowData) {
+        columns.forEach((column, colIndex) => {
+          const width = this.columnWidths[colIndex];
+          const value = rowData[colIndex]?.toString() ?? "";
+          this.drawCell(currentX, rowY, width, cellHeight, value, options.defaultCellStyle);
+          currentX += width;
+        });
+      }
+    }
+
+    // Draw selection
+    this.drawSelection();
+
+    // Draw hover
+    this.drawHover();
   }
 
   private measureText(text: string, style: CellStyle): number {
@@ -116,32 +368,28 @@ export class SpreadsheetVisualizer {
     return metrics.width + (style.padding || 8) * 2 + this.padding;
   }
 
-  private calculateColumnWidths(): void {
+  private async calculateColumnWidths(): Promise<void> {
     const { headerStyle, defaultCellStyle } = this.options;
 
     // Calculate widths based on content
-    this.columnWidths = this.columns.map((column, colIndex) => {
+    const widths = await Promise.all(this.columns.map(async (column, colIndex) => {
       // Measure header width
       const headerWidth = this.measureText(column.header, headerStyle);
 
       // Measure data widths
+      const data = await this.dataProvider.fetchData(0, Math.min(100, this.totalRows), colIndex, colIndex);
       const maxDataWidth = Math.max(
-        ...this.data.map((row) => {
-          const value = row[colIndex]?.toString() ?? "";
+        ...data.map(row => {
+          const value = row[0]?.toString() ?? "";
           return this.measureText(value, defaultCellStyle);
         })
       );
 
       // Use the larger of header width and max data width, but not less than minCellWidth
       return Math.max(headerWidth, maxDataWidth, this.minCellWidth);
-    });
-  }
+    }));
 
-  private resize(): void {
-    this.canvas.width = this.canvas.offsetWidth;
-    this.canvas.height = this.canvas.offsetHeight;
-    this.calculateColumnWidths();
-    this.draw();
+    this.columnWidths = widths;
   }
 
   private getCellAtPosition(x: number, y: number): CellPosition | null {
@@ -155,7 +403,7 @@ export class SpreadsheetVisualizer {
 
     // Check if click is in data rows
     const row = Math.floor((y - headerHeight) / cellHeight);
-    if (row >= 0 && row < this.data.length) {
+    if (row >= 0 && row < this.totalRows) {
       const col = this.getColumnAtX(x);
       return col !== null ? { row, col } : null;
     }
@@ -246,14 +494,7 @@ export class SpreadsheetVisualizer {
     this.isSelecting = false;
   }
 
-  private handleKeyDown(e: KeyboardEvent): void {
-    // Handle Ctrl+C or Cmd+C
-    if ((e.ctrlKey || e.metaKey) && e.key === "c") {
-      this.copySelection();
-    }
-  }
-
-  private copySelection(): void {
+  private async copySelection(): Promise<void> {
     if (!this.selectionStart || !this.selectionEnd) return;
 
     const startRow = Math.min(this.selectionStart.row, this.selectionEnd.row);
@@ -277,13 +518,20 @@ export class SpreadsheetVisualizer {
     }
 
     // Add data rows
-    for (let row = Math.max(0, startRow); row <= endRow; row++) {
+    const data = await this.dataProvider.fetchData(
+      Math.max(0, startRow),
+      endRow,
+      Math.max(0, startCol),
+      endCol
+    );
+
+    for (let row = 0; row < data.length; row++) {
       const cells: string[] = [];
       for (let col = startCol; col <= endCol; col++) {
         if (col === -1) {
-          cells.push((row + 1).toString());
+          cells.push((startRow + row + 1).toString());
         } else {
-          const value = this.data[row][this.columns[col].key]?.toString() ?? "";
+          const value = data[row][col - Math.max(0, startCol)]?.toString() ?? "";
           cells.push(value);
         }
       }
@@ -291,14 +539,12 @@ export class SpreadsheetVisualizer {
     }
 
     const text = rows.join("\n");
-    navigator.clipboard
-      .writeText(text)
-      .then(() => {
-        console.log("Selection copied to clipboard");
-      })
-      .catch((err) => {
-        console.error("Failed to copy selection:", err);
-      });
+    try {
+      await navigator.clipboard.writeText(text);
+      console.log("Selection copied to clipboard");
+    } catch (err) {
+      console.error("Failed to copy selection:", err);
+    }
   }
 
   private drawSelection(): void {
@@ -354,52 +600,6 @@ export class SpreadsheetVisualizer {
     this.ctx.strokeStyle = this.hoverBorderColor;
     this.ctx.lineWidth = 1;
     this.ctx.strokeRect(x, y, width, height);
-  }
-
-  private draw(): void {
-    const { ctx, canvas, columns, data, options } = this;
-    const { cellHeight, headerHeight, borderColor, borderWidth, rowIndexStyle } = options;
-
-    // Clear canvas
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    // Draw header starting from the left edge
-    let currentX = 0;
-
-    // Draw row index header
-    this.drawCell(currentX, 0, this.rowIndexWidth, headerHeight, "#", rowIndexStyle);
-    currentX += this.rowIndexWidth;
-
-    // Draw column headers
-    columns.forEach((column, index) => {
-      const width = this.columnWidths[index];
-      this.drawCell(currentX, 0, width, headerHeight, column.header, options.headerStyle);
-      currentX += width;
-    });
-
-    // Draw data rows
-    data.forEach((row, rowIndex) => {
-      currentX = 0;
-      const rowY = headerHeight + rowIndex * cellHeight;
-
-      // Draw row index
-      this.drawCell(currentX, rowY, this.rowIndexWidth, cellHeight, (rowIndex + 1).toString(), rowIndexStyle);
-      currentX += this.rowIndexWidth;
-
-      // Draw data cells
-      columns.forEach((column, index) => {
-        const width = this.columnWidths[index];
-        const value = row[index]?.toString() ?? "";
-        this.drawCell(currentX, rowY, width, cellHeight, value, options.defaultCellStyle);
-        currentX += width;
-      });
-    });
-
-    // Draw selection
-    this.drawSelection();
-
-    // Draw hover on top
-    this.drawHover();
   }
 
   private drawCell(x: number, y: number, width: number, height: number, text: string, style: CellStyle): void {
