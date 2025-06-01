@@ -14,6 +14,10 @@ export interface CellStyle {
   fontFamily?: string;
   textAlign?: "left" | "center" | "right";
   padding?: number;
+  // Type-specific styles
+  numericColor?: string;
+  dateColor?: string;
+  nullColor?: string;
 }
 
 export interface SpreadsheetOptions {
@@ -22,6 +26,10 @@ export interface SpreadsheetOptions {
   defaultCellStyle: CellStyle;
   headerStyle: CellStyle;
   rowIndexStyle: CellStyle;
+  // Type-specific default styles
+  numericStyle?: Partial<CellStyle>;
+  dateStyle?: Partial<CellStyle>;
+  nullStyle?: Partial<CellStyle>;
   borderColor: string;
   borderWidth: number;
   initialRowCount?: number; // Number of rows to fetch initially
@@ -37,6 +45,10 @@ export interface SpreadsheetOptions {
   scrollbarColor?: string;    // Color of the scrollbar track
   scrollbarThumbColor?: string; // Color of the scrollbar thumb
   scrollbarHoverColor?: string; // Color of the scrollbar thumb on hover
+  // Global format options
+  dateFormat?: string | Intl.DateTimeFormatOptions;
+  datetimeFormat?: string | Intl.DateTimeFormatOptions;
+  numberFormat?: string | Intl.NumberFormatOptions;
 }
 
 export interface DataProvider {
@@ -109,7 +121,7 @@ export class SpreadsheetVisualizer {
     this.columns = columns;
     this.dataProvider = dataProvider;
 
-    // Default options
+    // Default options with monospaced font and default formats
     this.options = {
       cellHeight: 30,
       headerHeight: 40,
@@ -117,26 +129,33 @@ export class SpreadsheetVisualizer {
         backgroundColor: "#ffffff",
         textColor: "#000000",
         fontSize: 14,
-        fontFamily: "Arial",
+        fontFamily: "Consolas, 'Courier New', monospace",
         textAlign: "left",
         padding: 8,
+        numericColor: "#0066cc",
+        dateColor: "#006633",
+        nullColor: "#cc0000"
       },
       headerStyle: {
         backgroundColor: "#f0f0f0",
         textColor: "#000000",
         fontSize: 14,
-        fontFamily: "Arial",
+        fontFamily: "Consolas, 'Courier New', monospace",
         textAlign: "center",
-        padding: 8,
+        padding: 8
       },
       rowIndexStyle: {
         backgroundColor: "#f8f9fa",
         textColor: "#6c757d",
         fontSize: 14,
-        fontFamily: "Arial",
+        fontFamily: "Consolas, 'Courier New', monospace",
         textAlign: "center",
-        padding: 8,
+        padding: 8
       },
+      // Default formats
+      dateFormat: 'yyyy-MM-dd',
+      datetimeFormat: 'yyyy-MM-dd HH:mm:ss',
+      numberFormat: { minimumFractionDigits: 2, maximumFractionDigits: 2 },
       borderColor: "#e0e0e0",
       borderWidth: 1,
       initialRowCount: 100,
@@ -405,8 +424,8 @@ export class SpreadsheetVisualizer {
           columns.forEach((column, colIndex) => {
             const width = this.columnWidths[colIndex];
             if (currentX + width > 0 && currentX < visibleWidth) {
-              const value = rowData[colIndex]?.toString() ?? "";
-              this.drawCell(currentX, rowY, width, cellHeight, value, options.defaultCellStyle);
+              const value = rowData[colIndex];
+              this.drawCell(currentX, rowY, width, cellHeight, value, options.defaultCellStyle, column);
             }
             currentX += width;
           });
@@ -695,7 +714,7 @@ export class SpreadsheetVisualizer {
     this.ctx.strokeRect(x, rowY, width, height);
   }
 
-  private drawCell(x: number, y: number, width: number, height: number, text: string, style: CellStyle): void {
+  private drawCell(x: number, y: number, width: number, height: number, value: any, style: CellStyle, column?: Column): void {
     const { ctx, canvas, options } = this;
     const { borderColor, borderWidth } = options;
 
@@ -708,16 +727,20 @@ export class SpreadsheetVisualizer {
     ctx.lineWidth = borderWidth;
     ctx.strokeRect(x, y, width, height);
 
-    // Draw text
-    ctx.fillStyle = style.textColor || "#000000";
-    ctx.font = `${style.fontSize || 14}px ${style.fontFamily || "Arial"}`;
-    ctx.textAlign = style.textAlign || "left";
+    // Format and style the cell value
+    const { text, style: typeStyle } = column ? this.formatCellValue(value, column) : { text: value, style: {} };
+    const finalStyle = { ...style, ...typeStyle };
 
-    const padding = style.padding || 8;
+    // Draw text with monospaced font
+    ctx.fillStyle = finalStyle.textColor || "#000000";
+    ctx.font = `${finalStyle.fontSize || 14}px ${finalStyle.fontFamily || "Consolas, 'Courier New', monospace"}`;
+    ctx.textAlign = finalStyle.textAlign || "left";
+
+    const padding = finalStyle.padding || 8;
     let textX = x + padding;
-    if (style.textAlign === "center") {
+    if (finalStyle.textAlign === "center") {
       textX = x + width / 2;
-    } else if (style.textAlign === "right") {
+    } else if (finalStyle.textAlign === "right") {
       textX = x + width - padding;
     }
 
@@ -728,9 +751,153 @@ export class SpreadsheetVisualizer {
     ctx.clip();
 
     // Draw text with vertical centering
-    const textY = y + (height + (style.fontSize || 14)) / 2;
+    const textY = y + (height + (finalStyle.fontSize || 14)) / 2;
     ctx.fillText(text, textX, textY);
     ctx.restore();
+  }
+
+  private parseFormat(format: string | undefined, type: 'number' | 'date' | 'datetime'): any {
+    if (!format) return undefined;
+    
+    try {
+      // First try parsing as JSON
+      return JSON.parse(format);
+    } catch (e) {
+      // If not JSON, handle as direct format string
+      if (type === 'date' || type === 'datetime') {
+        // Common date format patterns
+        const formatMap: { [key: string]: Intl.DateTimeFormatOptions } = {
+          'yyyy-MM-dd': { year: 'numeric', month: '2-digit', day: '2-digit' },
+          'dd/MM/yyyy': { day: '2-digit', month: '2-digit', year: 'numeric' },
+          'MM/dd/yyyy': { month: '2-digit', day: '2-digit', year: 'numeric' },
+          'yyyy/MM/dd': { year: 'numeric', month: '2-digit', day: '2-digit' },
+          'dd-MM-yyyy': { day: '2-digit', month: '2-digit', year: 'numeric' },
+          'MM-dd-yyyy': { month: '2-digit', day: '2-digit', year: 'numeric' },
+          'yyyyMMdd': { year: 'numeric', month: '2-digit', day: '2-digit' },
+          'ddMMyyyy': { day: '2-digit', month: '2-digit', year: 'numeric' },
+          'MMddyyyy': { month: '2-digit', day: '2-digit', year: 'numeric' },
+          'yyyy-MM-dd HH:mm:ss': { 
+            year: 'numeric', 
+            month: '2-digit', 
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit'
+          },
+          'dd/MM/yyyy HH:mm:ss': {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit'
+          }
+        };
+        
+        // Try to match the format string with known patterns
+        const matchedFormat = formatMap[format];
+        if (matchedFormat) {
+          return matchedFormat;
+        }
+
+        // If no match found, try to parse as a simple date format
+        if (format.includes('yyyy') || format.includes('MM') || format.includes('dd')) {
+          return {
+            year: format.includes('yyyy') ? 'numeric' : undefined,
+            month: format.includes('MM') ? '2-digit' : undefined,
+            day: format.includes('dd') ? '2-digit' : undefined,
+            hour: format.includes('HH') ? '2-digit' : undefined,
+            minute: format.includes('mm') ? '2-digit' : undefined,
+            second: format.includes('ss') ? '2-digit' : undefined
+          };
+        }
+      }
+      
+      // For number formats, return undefined if not valid JSON
+      return undefined;
+    }
+  }
+
+  private getFormatOptions(column: Column, type: 'number' | 'date' | 'datetime'): any {
+    // First try column-specific format
+    if (column.format) {
+      const parsedFormat = this.parseFormat(column.format, type);
+      if (parsedFormat) return parsedFormat;
+    }
+
+    // Then fall back to global format
+    switch (type) {
+      case 'date':
+        return this.parseFormat(this.options.dateFormat?.toString(), 'date');
+      case 'datetime':
+        return this.parseFormat(this.options.datetimeFormat?.toString(), 'date');
+      case 'number':
+        return this.parseFormat(this.options.numberFormat?.toString(), 'number');
+      default:
+        return undefined;
+    }
+  }
+
+  private formatCellValue(value: any, column: Column): { text: string; style: Partial<CellStyle> } {
+    if (value === null || value === undefined) {
+      return {
+        text: "NA",
+        style: this.options.nullStyle || { textColor: "#cc0000" }
+      };
+    }
+
+    switch (column.dataType) {
+      case "integer":
+      case "decimal":
+        const numValue = Number(value);
+        if (!isNaN(numValue)) {
+          const formatOptions = this.getFormatOptions(column, 'number');
+          const formattedValue = formatOptions 
+            ? new Intl.NumberFormat(undefined, formatOptions).format(numValue)
+            : numValue.toString();
+          return {
+            text: formattedValue,
+            style: this.options.numericStyle || { textAlign: "right", textColor: "#0066cc" }
+          };
+        }
+        break;
+
+      case "date":
+      case "datetime":
+        if (value instanceof Date || !isNaN(Date.parse(value))) {
+          const dateValue = new Date(value);
+          const formatOptions = this.getFormatOptions(column, column.dataType);
+          const formattedValue = formatOptions
+            ? new Intl.DateTimeFormat(undefined, formatOptions).format(dateValue)
+            : column.dataType === "date" 
+              ? dateValue.toLocaleDateString()
+              : dateValue.toLocaleString();
+          return {
+            text: formattedValue,
+            style: this.options.dateStyle || { textAlign: "right", textColor: "#006633" }
+          };
+        }
+        break;
+
+      case "boolean":
+        return {
+          text: value ? "Yes" : "No",
+          style: { textAlign: "center" }
+        };
+
+      case "string":
+      default:
+        return {
+          text: value.toString(),
+          style: {}
+        };
+    }
+
+    // If type conversion fails, treat as string
+    return {
+      text: value.toString(),
+      style: {}
+    };
   }
 
   private isCellSelected(cell: CellPosition): boolean {
