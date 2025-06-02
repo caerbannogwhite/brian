@@ -1,0 +1,654 @@
+import { Column, SpreadsheetOptions, DataProvider } from './types';
+
+type RequiredSpreadsheetOptions = Omit<Required<SpreadsheetOptions>, 'height' | 'width'> & {
+  height: number;
+  width: number;
+};
+
+export class SpreadsheetVisualizer {
+  private canvas: HTMLCanvasElement;
+  private ctx: CanvasRenderingContext2D;
+  private columns: Column[];
+  private dataProvider: DataProvider;
+  private options: RequiredSpreadsheetOptions;
+
+  // State variables
+  private scrollX = 0;
+  private scrollY = 0;
+  private hoveredCell: { row: number; col: number } | null = null;
+  private selectedCells: { startRow: number; endRow: number; startCol: number; endCol: number } | null = null;
+  private isDragging = false;
+  private isHoveringVerticalScrollbar = false;
+  private isHoveringHorizontalScrollbar = false;
+  private isDraggingVerticalScrollbar = false;
+  private isDraggingHorizontalScrollbar = false;
+  private dragStartX = 0;
+  private dragStartY = 0;
+  private lastScrollX = 0;
+  private lastScrollY = 0;
+
+  // Cache
+  private columnWidths: number[] = [];
+  private totalWidth = 0;
+  private totalHeight = 0;
+  private visibleRows = 0;
+  private visibleColumns = 0;
+  private dataCache: Map<string, any[][]> = new Map();
+
+  constructor(
+    canvas: HTMLCanvasElement,
+    columns: Column[],
+    dataProvider: DataProvider,
+    options: Partial<SpreadsheetOptions> = {}
+  ) {
+    this.canvas = canvas;
+    this.ctx = canvas.getContext('2d')!;
+    this.columns = columns;
+    this.dataProvider = dataProvider;
+
+    // Get container dimensions
+    const container = canvas.parentElement;
+    const containerRect = container?.getBoundingClientRect();
+    const containerWidth = containerRect?.width ?? options.maxWidth ?? 1200;
+    const containerHeight = containerRect?.height ?? options.maxHeight ?? 800;
+
+    // Set default options
+    this.options = {
+      // Viewport options
+      maxHeight: options.maxHeight ?? 800,
+      maxWidth: options.maxWidth ?? 1200,
+      minHeight: options.minHeight ?? 400,
+      minWidth: options.minWidth ?? 600,
+      height: options.height ?? containerWidth,
+      width: options.width ?? containerHeight,
+
+      // Cell options
+      cellHeight: options.cellHeight ?? 24,
+      minCellWidth: options.minCellWidth ?? 100,
+      cellPadding: options.cellPadding ?? 8,
+      rowHeaderWidth: options.rowHeaderWidth ?? 60,
+
+      // Style options
+      fontFamily: options.fontFamily ?? 'Consolas, monospace',
+      fontSize: options.fontSize ?? 14,
+      headerFontSize: options.headerFontSize ?? 14,
+      headerBackgroundColor: options.headerBackgroundColor ?? '#f0f0f0',
+      headerTextColor: options.headerTextColor ?? '#333',
+      cellBackgroundColor: options.cellBackgroundColor ?? '#fff',
+      cellTextColor: options.cellTextColor ?? '#000',
+      borderColor: options.borderColor ?? '#ddd',
+      selectionColor: options.selectionColor ?? 'rgba(0, 120, 215, 0.2)',
+      hoverColor: options.hoverColor ?? 'rgba(0, 120, 215, 0.1)',
+
+      // Scrollbar options
+      scrollbarWidth: options.scrollbarWidth ?? 12,
+      scrollbarColor: options.scrollbarColor ?? '#e0e0e0',
+      scrollbarThumbColor: options.scrollbarThumbColor ?? '#b0b0b0',
+      scrollbarHoverColor: options.scrollbarHoverColor ?? '#909090',
+
+      // Format options
+      dateFormat: options.dateFormat ?? 'yyyy-MM-dd',
+      datetimeFormat: options.datetimeFormat ?? 'yyyy-MM-dd HH:mm:ss',
+      numberFormat: options.numberFormat ?? { minimumFractionDigits: 2, maximumFractionDigits: 2 }
+    };
+
+    // Apply constraints
+    this.options.height = Math.min(Math.max(this.options.height, this.options.minHeight), this.options.maxHeight);
+    this.options.width = Math.min(Math.max(this.options.width, this.options.minWidth), this.options.maxWidth);
+
+    this.setupEventListeners();
+    this.updateCanvasSize();
+    this.calculateColumnWidths();
+    this.draw();
+  }
+
+  private setupEventListeners() {
+    // Mouse events
+    this.canvas.addEventListener('mousedown', (event) => this.handleMouseDown(event).catch(console.error));
+    this.canvas.addEventListener('mousemove', (event) => this.handleMouseMove(event).catch(console.error));
+    this.canvas.addEventListener('mouseup', this.handleMouseUp.bind(this));
+    this.canvas.addEventListener('mouseleave', this.handleMouseLeave.bind(this));
+    this.canvas.addEventListener('wheel', (event) => this.handleWheel(event).catch(console.error));
+
+    // Keyboard events
+    window.addEventListener('keydown', (event) => this.handleKeyDown(event).catch(console.error));
+
+    // Window events
+    window.addEventListener('resize', () => this.handleResize().catch(console.error));
+  }
+
+  private async updateCanvasSize() {
+    const container = this.canvas.parentElement;
+    if (!container) return;
+
+    const containerRect = container.getBoundingClientRect();
+    const containerWidth = containerRect.width;
+    const containerHeight = containerRect.height;
+
+    // Calculate canvas dimensions based on options and container size
+    let width = this.options.width ?? containerWidth;
+    let height = this.options.height ?? containerHeight;
+
+    // Apply constraints
+    width = Math.min(Math.max(width, this.options.minWidth), this.options.maxWidth);
+    height = Math.min(Math.max(height, this.options.minHeight), this.options.maxHeight);
+
+    // Update canvas size
+    this.canvas.width = width;
+    this.canvas.height = height;
+
+    // Recalculate column widths and redraw
+    this.calculateColumnWidths();
+    await this.draw();
+  }
+
+  private calculateColumnWidths() {
+    const availableWidth = this.canvas.width - this.options.rowHeaderWidth;
+    const minTotalWidth = this.columns.length * this.options.minCellWidth;
+    const hasScrollbar = minTotalWidth > availableWidth;
+
+    // Calculate minimum widths based on content
+    this.columnWidths = this.columns.map(col => {
+      const headerWidth = this.ctx.measureText(col.header).width + this.options.cellPadding * 2;
+      return Math.max(headerWidth, this.options.minCellWidth);
+    });
+
+    // Calculate total width
+    this.totalWidth = this.columnWidths.reduce((sum, width) => sum + width, 0) + this.options.rowHeaderWidth;
+
+    // If we have extra space, distribute it proportionally
+    if (this.totalWidth < availableWidth) {
+      const extraWidth = availableWidth - this.totalWidth;
+      const totalMinWidth = this.columnWidths.reduce((sum, width) => sum + width, 0);
+      this.columnWidths = this.columnWidths.map(width => width + (width / totalMinWidth) * extraWidth);
+      this.totalWidth = availableWidth;
+    }
+
+    // Update visible columns
+    this.visibleColumns = Math.ceil(availableWidth / (this.totalWidth / this.columns.length));
+  }
+
+  private async draw() {
+    const { ctx, canvas } = this;
+    const { width, height } = canvas;
+
+    // Clear canvas
+    ctx.clearRect(0, 0, width, height);
+
+    // Calculate visible area
+    const visibleStartRow = Math.floor(this.scrollY / this.options.cellHeight);
+    const visibleEndRow = Math.min(
+      visibleStartRow + Math.ceil(height / this.options.cellHeight),
+      await this.dataProvider.getTotalRows()
+    );
+
+    const visibleStartCol = Math.floor(this.scrollX / (this.totalWidth / this.columns.length));
+    const visibleEndCol = Math.min(
+      visibleStartCol + this.visibleColumns,
+      await this.dataProvider.getTotalColumns()
+    );
+
+    // Draw cells
+    await this.drawCells(visibleStartRow, visibleEndRow, visibleStartCol, visibleEndCol);
+
+    // Draw selection
+    if (this.selectedCells) {
+      this.drawSelection();
+    }
+
+    // Draw hover
+    if (this.hoveredCell) {
+      this.drawHover();
+    }
+
+    // Draw scrollbars
+    this.drawScrollbars();
+  }
+
+  private async handleMouseDown(event: MouseEvent) {
+    const rect = this.canvas.getBoundingClientRect();
+    const x = event.clientX - rect.left;
+    const y = event.clientY - rect.top;
+
+    // Check if clicking on scrollbars
+    if (this.isOverVerticalScrollbar(x, y)) {
+      this.isDraggingVerticalScrollbar = true;
+      this.dragStartY = y;
+      this.lastScrollY = this.scrollY;
+      return;
+    }
+
+    if (this.isOverHorizontalScrollbar(x, y)) {
+      this.isDraggingHorizontalScrollbar = true;
+      this.dragStartX = x;
+      this.lastScrollX = this.scrollX;
+      return;
+    }
+
+    // Handle cell selection
+    const cell = await this.getCellAtPosition(x, y);
+    if (cell) {
+      this.isDragging = true;
+      this.selectedCells = {
+        startRow: cell.row,
+        endRow: cell.row,
+        startCol: cell.col,
+        endCol: cell.col
+      };
+      this.draw();
+    }
+  }
+
+  private async handleMouseMove(event: MouseEvent) {
+    const rect = this.canvas.getBoundingClientRect();
+    const x = event.clientX - rect.left;
+    const y = event.clientY - rect.top;
+
+    // Handle scrollbar dragging
+    if (this.isDraggingVerticalScrollbar) {
+      const deltaY = y - this.dragStartY;
+      const scrollRatio = deltaY / (this.canvas.height - this.options.scrollbarWidth);
+      this.scrollY = Math.max(0, this.lastScrollY + scrollRatio * this.totalHeight);
+      this.draw();
+      return;
+    }
+
+    if (this.isDraggingHorizontalScrollbar) {
+      const deltaX = x - this.dragStartX;
+      const scrollRatio = deltaX / (this.canvas.width - this.options.scrollbarWidth);
+      this.scrollX = Math.max(0, this.lastScrollX + scrollRatio * this.totalWidth);
+      this.draw();
+      return;
+    }
+
+    // Update hover state
+    const cell = await this.getCellAtPosition(x, y);
+    if (cell) {
+      this.hoveredCell = cell;
+      this.isHoveringVerticalScrollbar = false;
+      this.isHoveringHorizontalScrollbar = false;
+    } else {
+      this.hoveredCell = null;
+      this.isHoveringVerticalScrollbar = this.isOverVerticalScrollbar(x, y);
+      this.isHoveringHorizontalScrollbar = this.isOverHorizontalScrollbar(x, y);
+    }
+
+    // Update selection if dragging
+    if (this.isDragging && cell && this.selectedCells) {
+      this.selectedCells.endRow = cell.row;
+      this.selectedCells.endCol = cell.col;
+      this.draw();
+    }
+
+    this.draw();
+  }
+
+  private handleMouseUp() {
+    this.isDragging = false;
+    this.isDraggingVerticalScrollbar = false;
+    this.isDraggingHorizontalScrollbar = false;
+  }
+
+  private handleMouseLeave() {
+    this.hoveredCell = null;
+    this.isHoveringVerticalScrollbar = false;
+    this.isHoveringHorizontalScrollbar = false;
+    this.isDragging = false;
+    this.isDraggingVerticalScrollbar = false;
+    this.isDraggingHorizontalScrollbar = false;
+    this.draw();
+  }
+
+  private async handleWheel(event: WheelEvent) {
+    event.preventDefault();
+
+    if (event.ctrlKey) {
+      // Zoom
+      const zoomFactor = event.deltaY > 0 ? 0.9 : 1.1;
+      this.options.fontSize = Math.max(8, Math.min(24, this.options.fontSize * zoomFactor));
+      this.options.headerFontSize = Math.max(8, Math.min(24, this.options.headerFontSize * zoomFactor));
+      this.calculateColumnWidths();
+    } else {
+      // Scroll
+      this.scrollY = Math.max(0, this.scrollY + event.deltaY);
+      this.scrollX = Math.max(0, this.scrollX + event.deltaX);
+    }
+
+    await this.draw();
+  }
+
+  private async handleKeyDown(event: KeyboardEvent) {
+    if (!this.selectedCells) return;
+
+    const { startRow, endRow, startCol, endCol } = this.selectedCells;
+    const row = event.shiftKey ? endRow : startRow;
+    const col = event.shiftKey ? endCol : startCol;
+
+    switch (event.key) {
+      case 'ArrowUp':
+        if (row > 0) {
+          this.selectedCells = {
+            startRow: event.shiftKey ? startRow : row - 1,
+            endRow: event.shiftKey ? row - 1 : row - 1,
+            startCol: event.shiftKey ? startCol : col,
+            endCol: event.shiftKey ? endCol : col
+          };
+          this.scrollY = Math.max(0, (row - 1) * this.options.cellHeight - this.canvas.height / 2);
+        }
+        break;
+
+      case 'ArrowDown':
+        this.selectedCells = {
+          startRow: event.shiftKey ? startRow : row + 1,
+          endRow: event.shiftKey ? row + 1 : row + 1,
+          startCol: event.shiftKey ? startCol : col,
+          endCol: event.shiftKey ? endCol : col
+        };
+        this.scrollY = Math.max(0, (row + 1) * this.options.cellHeight - this.canvas.height / 2);
+        break;
+
+      case 'ArrowLeft':
+        if (col > 0) {
+          this.selectedCells = {
+            startRow: event.shiftKey ? startRow : row,
+            endRow: event.shiftKey ? endRow : row,
+            startCol: event.shiftKey ? startCol : col - 1,
+            endCol: event.shiftKey ? col - 1 : col - 1
+          };
+          this.scrollX = Math.max(0, this.getColumnOffset(col - 1) - this.canvas.width / 2);
+        }
+        break;
+
+      case 'ArrowRight':
+        if (col < this.columns.length - 1) {
+          this.selectedCells = {
+            startRow: event.shiftKey ? startRow : row,
+            endRow: event.shiftKey ? endRow : row,
+            startCol: event.shiftKey ? startCol : col + 1,
+            endCol: event.shiftKey ? col + 1 : col + 1
+          };
+          this.scrollX = Math.max(0, this.getColumnOffset(col + 1) - this.canvas.width / 2);
+        }
+        break;
+
+      case 'c':
+        if (event.ctrlKey || event.metaKey) {
+          this.copySelection();
+        }
+        break;
+    }
+
+    await this.draw();
+  }
+
+  private async handleResize() {
+    this.updateCanvasSize();
+    await this.draw();
+  }
+
+  private isOverVerticalScrollbar(x: number, y: number): boolean {
+    return x >= this.canvas.width - this.options.scrollbarWidth;
+  }
+
+  private isOverHorizontalScrollbar(x: number, y: number): boolean {
+    return y >= this.canvas.height - this.options.scrollbarWidth;
+  }
+
+  private getColumnOffset(col: number): number {
+    return this.columnWidths.slice(0, col).reduce((sum, width) => sum + width, 0) + this.options.rowHeaderWidth;
+  }
+
+  private async copySelection() {
+    if (!this.selectedCells) return;
+
+    const { startRow, endRow, startCol, endCol } = this.selectedCells;
+    const data = await this.dataProvider.fetchData(
+      Math.min(startRow, endRow),
+      Math.max(startRow, endRow) + 1,
+      Math.min(startCol, endCol),
+      Math.max(startCol, endCol) + 1
+    );
+
+    const text = data.map(row =>
+      row.map(cell => this.formatCellValue(cell)).join('\t')
+    ).join('\n');
+
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch (err) {
+      console.error('Failed to copy to clipboard:', err);
+    }
+  }
+
+  private formatCellValue(value: any): string {
+    if (value === null || value === undefined) return 'NA';
+    if (typeof value === 'string') return value;
+    if (typeof value === 'number') return value.toLocaleString(undefined, this.options.numberFormat);
+    if (value instanceof Date) {
+      const format = value.getHours() === 0 && value.getMinutes() === 0
+        ? this.options.dateFormat
+        : this.options.datetimeFormat;
+      return format.replace(/yyyy|MM|dd|HH|mm|ss/g, match => {
+        switch (match) {
+          case 'yyyy': return value.getFullYear().toString();
+          case 'MM': return (value.getMonth() + 1).toString().padStart(2, '0');
+          case 'dd': return value.getDate().toString().padStart(2, '0');
+          case 'HH': return value.getHours().toString().padStart(2, '0');
+          case 'mm': return value.getMinutes().toString().padStart(2, '0');
+          case 'ss': return value.getSeconds().toString().padStart(2, '0');
+          default: return match;
+        }
+      });
+    }
+    return String(value);
+  }
+
+  private async getCellAtPosition(x: number, y: number): Promise<{ row: number; col: number } | null> {
+    const adjustedX = x + this.scrollX;
+    const adjustedY = y + this.scrollY;
+
+    // Check if we're in the row header area
+    if (adjustedX < this.options.rowHeaderWidth) {
+      const row = Math.floor(adjustedY / this.options.cellHeight);
+      const totalRows = await this.dataProvider.getTotalRows();
+      if (row >= 0 && row < totalRows) {
+        return { row, col: -1 };
+      }
+      return null;
+    }
+
+    // Find the column
+    let colOffset = this.options.rowHeaderWidth;
+    let col = 0;
+    for (; col < this.columnWidths.length; col++) {
+      if (adjustedX < colOffset + this.columnWidths[col]) break;
+      colOffset += this.columnWidths[col];
+    }
+
+    // Find the row
+    const row = Math.floor(adjustedY / this.options.cellHeight);
+    const totalRows = await this.dataProvider.getTotalRows();
+    const totalColumns = await this.dataProvider.getTotalColumns();
+
+    // Check bounds
+    if (row >= 0 && row < totalRows && col < totalColumns) {
+      return { row, col };
+    }
+
+    return null;
+  }
+
+  private async drawCells(startRow: number, endRow: number, startCol: number, endCol: number) {
+    const { ctx, canvas } = this;
+    const { width, height } = canvas;
+
+    // Draw headers
+    ctx.fillStyle = this.options.headerBackgroundColor;
+    ctx.fillRect(0, 0, width, this.options.cellHeight);
+    ctx.fillRect(0, 0, this.options.rowHeaderWidth, height);
+
+    // Draw column headers
+    ctx.font = `${this.options.headerFontSize}px ${this.options.fontFamily}`;
+    ctx.fillStyle = this.options.headerTextColor;
+    ctx.textBaseline = 'middle';
+
+    let x = this.options.rowHeaderWidth - this.scrollX;
+    for (let col = startCol; col < endCol; col++) {
+      const column = this.columns[col];
+      const cellWidth = this.columnWidths[col];
+      const text = column.header;
+      const textWidth = ctx.measureText(text).width;
+      const textX = x + (cellWidth - textWidth) / 2;
+      const textY = this.options.cellHeight / 2;
+
+      if (x + cellWidth > 0 && x < width) {
+        ctx.fillText(text, textX, textY);
+      }
+      x += cellWidth;
+    }
+
+    // Draw row headers
+    ctx.textAlign = 'right';
+    let y = this.options.cellHeight - this.scrollY;
+    for (let row = startRow; row < endRow; row++) {
+      if (y + this.options.cellHeight > 0 && y < height) {
+        const text = (row + 1).toString();
+        const textX = this.options.rowHeaderWidth - this.options.cellPadding;
+        const textY = y + this.options.cellHeight / 2;
+        ctx.fillText(text, textX, textY);
+      }
+      y += this.options.cellHeight;
+    }
+
+    // Draw cells
+    const data = await this.dataProvider.fetchData(startRow, endRow, startCol, endCol);
+    ctx.textAlign = 'left';
+    ctx.font = `${this.options.fontSize}px ${this.options.fontFamily}`;
+    ctx.fillStyle = this.options.cellTextColor;
+
+    y = this.options.cellHeight - this.scrollY;
+    for (let row = 0; row < data.length; row++) {
+      x = this.options.rowHeaderWidth - this.scrollX;
+      for (let col = 0; col < data[row].length; col++) {
+        const cellWidth = this.columnWidths[col + startCol];
+        const value = data[row][col];
+        const column = this.columns[col + startCol];
+
+        if (x + cellWidth > 0 && x < width && y + this.options.cellHeight > 0 && y < height) {
+          // Draw cell background
+          ctx.fillStyle = this.options.cellBackgroundColor;
+          ctx.fillRect(x, y, cellWidth, this.options.cellHeight);
+
+          // Draw cell text
+          ctx.fillStyle = this.options.cellTextColor;
+          const text = this.formatCellValue(value);
+          const textWidth = ctx.measureText(text).width;
+          const textX = x + this.options.cellPadding;
+          const textY = y + this.options.cellHeight / 2;
+
+          // Align text based on data type
+          if (column.dataType === 'number' || column.dataType === 'date' || column.dataType === 'datetime') {
+            ctx.textAlign = 'right';
+            ctx.fillText(text, x + cellWidth - this.options.cellPadding, textY);
+          } else {
+            ctx.textAlign = 'left';
+            ctx.fillText(text, textX, textY);
+          }
+
+          // Draw cell border
+          ctx.strokeStyle = this.options.borderColor;
+          ctx.strokeRect(x, y, cellWidth, this.options.cellHeight);
+        }
+
+        x += cellWidth;
+      }
+      y += this.options.cellHeight;
+    }
+  }
+
+  private drawSelection() {
+    if (!this.selectedCells) return;
+
+    const { ctx } = this;
+    const { startRow, endRow, startCol, endCol } = this.selectedCells;
+
+    // Draw selection rectangles
+    ctx.fillStyle = this.options.selectionColor;
+
+    const minRow = Math.min(startRow, endRow);
+    const maxRow = Math.max(startRow, endRow);
+    const minCol = Math.min(startCol, endCol);
+    const maxCol = Math.max(startCol, endCol);
+
+    for (let row = minRow; row <= maxRow; row++) {
+      for (let col = minCol; col <= maxCol; col++) {
+        const x = this.getColumnOffset(col) - this.scrollX;
+        const y = row * this.options.cellHeight - this.scrollY;
+        const width = this.columnWidths[col];
+        const height = this.options.cellHeight;
+
+        if (x + width > 0 && x < this.canvas.width && y + height > 0 && y < this.canvas.height) {
+          ctx.fillRect(x, y, width, height);
+        }
+      }
+    }
+  }
+
+  private drawHover() {
+    if (!this.hoveredCell) return;
+
+    const { ctx } = this;
+    const { row, col } = this.hoveredCell;
+
+    // Draw hover rectangle
+    ctx.fillStyle = this.options.hoverColor;
+
+    const x = col === -1 ? 0 : this.getColumnOffset(col) - this.scrollX;
+    const y = row * this.options.cellHeight - this.scrollY;
+    const width = col === -1 ? this.options.rowHeaderWidth : this.columnWidths[col];
+    const height = this.options.cellHeight;
+
+    if (x + width > 0 && x < this.canvas.width && y + height > 0 && y < this.canvas.height) {
+      ctx.fillRect(x, y, width, height);
+    }
+  }
+
+  private drawScrollbars() {
+    const { ctx, canvas } = this;
+    const { width, height } = canvas;
+
+    // Draw vertical scrollbar
+    if (this.totalHeight > height) {
+      const scrollbarHeight = (height / this.totalHeight) * height;
+      const scrollbarY = (this.scrollY / this.totalHeight) * height;
+      const scrollbarX = width - this.options.scrollbarWidth;
+
+      // Draw track
+      ctx.fillStyle = this.options.scrollbarColor;
+      ctx.fillRect(scrollbarX, 0, this.options.scrollbarWidth, height);
+
+      // Draw thumb
+      ctx.fillStyle = this.isHoveringVerticalScrollbar || this.isDraggingVerticalScrollbar
+        ? this.options.scrollbarHoverColor
+        : this.options.scrollbarThumbColor;
+      ctx.fillRect(scrollbarX, scrollbarY, this.options.scrollbarWidth, scrollbarHeight);
+    }
+
+    // Draw horizontal scrollbar
+    if (this.totalWidth > width) {
+      const scrollbarWidth = (width / this.totalWidth) * width;
+      const scrollbarX = (this.scrollX / this.totalWidth) * width;
+      const scrollbarY = height - this.options.scrollbarWidth;
+
+      // Draw track
+      ctx.fillStyle = this.options.scrollbarColor;
+      ctx.fillRect(0, scrollbarY, width, this.options.scrollbarWidth);
+
+      // Draw thumb
+      ctx.fillStyle = this.isHoveringHorizontalScrollbar || this.isDraggingHorizontalScrollbar
+        ? this.options.scrollbarHoverColor
+        : this.options.scrollbarThumbColor;
+      ctx.fillRect(scrollbarX, scrollbarY, scrollbarWidth, this.options.scrollbarWidth);
+    }
+  }
+} 
