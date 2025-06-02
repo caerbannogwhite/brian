@@ -36,13 +36,13 @@ export interface SpreadsheetOptions {
   rowBuffer?: number; // Number of rows to keep in buffer
   // Viewport options
   maxHeight?: number; // Maximum height of the visualization
-  maxWidth?: number;  // Maximum width of the visualization
+  maxWidth?: number; // Maximum width of the visualization
   minHeight?: number; // Minimum height of the visualization
-  minWidth?: number;  // Minimum width of the visualization
-  height?: number;    // Fixed height (if specified)
-  width?: number;     // Fixed width (if specified)
-  scrollbarWidth?: number;    // Width of the scrollbars
-  scrollbarColor?: string;    // Color of the scrollbar track
+  minWidth?: number; // Minimum width of the visualization
+  height?: number; // Fixed height (if specified)
+  width?: number; // Fixed width (if specified)
+  scrollbarWidth?: number; // Width of the scrollbars
+  scrollbarColor?: string; // Color of the scrollbar track
   scrollbarThumbColor?: string; // Color of the scrollbar thumb
   scrollbarHoverColor?: string; // Color of the scrollbar thumb on hover
   // Global format options
@@ -110,12 +110,7 @@ export class SpreadsheetVisualizer {
   private lastMouseY: number = 0;
   private lastMouseX: number = 0;
 
-  constructor(
-    canvas: HTMLCanvasElement,
-    columns: Column[],
-    dataProvider: DataProvider,
-    options: Partial<SpreadsheetOptions> = {}
-  ) {
+  constructor(canvas: HTMLCanvasElement, columns: Column[], dataProvider: DataProvider, options: Partial<SpreadsheetOptions> = {}) {
     this.canvas = canvas;
     this.ctx = canvas.getContext("2d")!;
     this.columns = columns;
@@ -134,7 +129,7 @@ export class SpreadsheetVisualizer {
         padding: 8,
         numericColor: "#0066cc",
         dateColor: "#006633",
-        nullColor: "#cc0000"
+        nullColor: "#cc0000",
       },
       headerStyle: {
         backgroundColor: "#f0f0f0",
@@ -142,7 +137,7 @@ export class SpreadsheetVisualizer {
         fontSize: 14,
         fontFamily: "Consolas, 'Courier New', monospace",
         textAlign: "center",
-        padding: 8
+        padding: 8,
       },
       rowIndexStyle: {
         backgroundColor: "#f8f9fa",
@@ -150,11 +145,11 @@ export class SpreadsheetVisualizer {
         fontSize: 14,
         fontFamily: "Consolas, 'Courier New', monospace",
         textAlign: "center",
-        padding: 8
+        padding: 8,
       },
       // Default formats
-      dateFormat: 'yyyy-MM-dd',
-      datetimeFormat: 'yyyy-MM-dd HH:mm:ss',
+      dateFormat: "yyyy-MM-dd",
+      datetimeFormat: "yyyy-MM-dd HH:mm:ss",
       numberFormat: { minimumFractionDigits: 2, maximumFractionDigits: 2 },
       borderColor: "#e0e0e0",
       borderWidth: 1,
@@ -217,10 +212,7 @@ export class SpreadsheetVisualizer {
     if (this.isFetching) return;
 
     const startRow = Math.max(0, Math.floor(this.scrollY / this.options.cellHeight));
-    const endRow = Math.min(
-      this.totalRows,
-      startRow + this.visibleRows
-    );
+    const endRow = Math.min(this.totalRows, startRow + this.visibleRows);
 
     // Don't fetch if we already have this range
     if (startRow === this.lastFetchStart && endRow === this.lastFetchEnd) {
@@ -229,12 +221,7 @@ export class SpreadsheetVisualizer {
 
     this.isFetching = true;
     try {
-      const data = await this.dataProvider.fetchData(
-        startRow,
-        endRow,
-        0,
-        this.totalColumns - 1
-      );
+      const data = await this.dataProvider.fetchData(startRow, endRow, 0, this.totalColumns - 1);
 
       // Update cache
       data.forEach((row, index) => {
@@ -298,7 +285,7 @@ export class SpreadsheetVisualizer {
     // Vertical scroll
     if (deltaY !== 0) {
       const newScrollY = Math.max(0, this.scrollY + deltaY);
-      const maxScrollY = Math.max(0, (this.totalRows * cellHeight) - this.canvas.height);
+      const maxScrollY = Math.max(0, this.totalRows * cellHeight - this.canvas.height);
       this.scrollY = Math.min(newScrollY, maxScrollY);
     }
 
@@ -331,34 +318,25 @@ export class SpreadsheetVisualizer {
         newScrollY = Math.max(0, this.scrollY - cellHeight);
         break;
       case "ArrowDown":
-        newScrollY = Math.min(
-          (this.totalRows * cellHeight) - this.canvas.height,
-          this.scrollY + cellHeight
-        );
+        newScrollY = Math.min(this.totalRows * cellHeight - this.canvas.height, this.scrollY + cellHeight);
         break;
       case "ArrowLeft":
         newScrollX = Math.max(0, this.scrollX - 50);
         break;
       case "ArrowRight":
-        newScrollX = Math.min(
-          this.columnWidths.reduce((sum, width) => sum + width, 0) - this.canvas.width,
-          this.scrollX + 50
-        );
+        newScrollX = Math.min(this.columnWidths.reduce((sum, width) => sum + width, 0) - this.canvas.width, this.scrollX + 50);
         break;
       case "PageUp":
         newScrollY = Math.max(0, this.scrollY - this.canvas.height);
         break;
       case "PageDown":
-        newScrollY = Math.min(
-          (this.totalRows * cellHeight) - this.canvas.height,
-          this.scrollY + this.canvas.height
-        );
+        newScrollY = Math.min(this.totalRows * cellHeight - this.canvas.height, this.scrollY + this.canvas.height);
         break;
       case "Home":
         newScrollY = 0;
         break;
       case "End":
-        newScrollY = (this.totalRows * cellHeight) - this.canvas.height;
+        newScrollY = this.totalRows * cellHeight - this.canvas.height;
         break;
       default:
         return;
@@ -393,7 +371,7 @@ export class SpreadsheetVisualizer {
 
     // Draw header (fixed)
     let currentX = -this.scrollX;
-    
+
     // Draw row index header
     this.drawCell(currentX, 0, this.rowIndexWidth, headerHeight, "#", rowIndexStyle);
     currentX += this.rowIndexWidth;
@@ -410,7 +388,7 @@ export class SpreadsheetVisualizer {
     // Draw data rows
     for (let rowIndex = startRow; rowIndex < endRow; rowIndex++) {
       currentX = -this.scrollX;
-      const rowY = headerHeight + (rowIndex * cellHeight) - this.scrollY;
+      const rowY = headerHeight + rowIndex * cellHeight - this.scrollY;
 
       // Only draw if row is visible
       if (rowY + cellHeight > 0 && rowY < visibleHeight) {
@@ -460,7 +438,7 @@ export class SpreadsheetVisualizer {
 
       // Measure data widths (using cached data)
       const maxDataWidth = Math.max(
-        ...Array.from(this.dataCache.values()).map(row => {
+        ...Array.from(this.dataCache.values()).map((row) => {
           const value = row[colIndex]?.toString() ?? "";
           return this.measureText(value, defaultCellStyle);
         })
@@ -477,11 +455,11 @@ export class SpreadsheetVisualizer {
     if (totalMinWidth < availableWidth) {
       const extraWidth = availableWidth - totalMinWidth;
       const extraPerColumn = extraWidth / this.columns.length;
-      this.columnWidths = minWidths.map(width => width + extraPerColumn);
+      this.columnWidths = minWidths.map((width) => width + extraPerColumn);
     } else {
       // If content is wider than available space, scale down proportionally
       const scale = availableWidth / totalMinWidth;
-      this.columnWidths = minWidths.map(width => Math.max(this.minCellWidth, width * scale));
+      this.columnWidths = minWidths.map((width) => Math.max(this.minCellWidth, width * scale));
     }
   }
 
@@ -616,12 +594,7 @@ export class SpreadsheetVisualizer {
     }
 
     // Add data rows
-    const data = await this.dataProvider.fetchData(
-      Math.max(0, startRow),
-      endRow,
-      Math.max(0, startCol),
-      endCol
-    );
+    const data = await this.dataProvider.fetchData(Math.max(0, startRow), endRow, Math.max(0, startCol), endCol);
 
     for (let row = 0; row < data.length; row++) {
       const cells: string[] = [];
@@ -659,8 +632,8 @@ export class SpreadsheetVisualizer {
 
     // Draw selection rectangles
     for (let row = startRow; row <= endRow; row++) {
-      const rowY = row === -1 ? 0 : headerHeight + (row * cellHeight) - this.scrollY;
-      
+      const rowY = row === -1 ? 0 : headerHeight + row * cellHeight - this.scrollY;
+
       // Skip if row is not visible
       if (rowY + cellHeight < 0 || rowY > visibleHeight) continue;
 
@@ -696,7 +669,7 @@ export class SpreadsheetVisualizer {
     // Don't draw hover if cell is selected
     if (this.isCellSelected(this.hoverCell)) return;
 
-    const rowY = row === -1 ? 0 : headerHeight + (row * cellHeight) - this.scrollY;
+    const rowY = row === -1 ? 0 : headerHeight + row * cellHeight - this.scrollY;
     const height = row === -1 ? headerHeight : cellHeight;
     const x = this.getColumnX(col) - this.scrollX;
     const width = col === -1 ? this.rowIndexWidth : this.columnWidths[col];
@@ -756,44 +729,44 @@ export class SpreadsheetVisualizer {
     ctx.restore();
   }
 
-  private parseFormat(format: string | undefined, type: 'number' | 'date' | 'datetime'): any {
+  private parseFormat(format: string | undefined, type: "number" | "date" | "datetime"): any {
     if (!format) return undefined;
-    
+
     try {
       // First try parsing as JSON
       return JSON.parse(format);
     } catch (e) {
       // If not JSON, handle as direct format string
-      if (type === 'date' || type === 'datetime') {
+      if (type === "date" || type === "datetime") {
         // Common date format patterns
         const formatMap: { [key: string]: Intl.DateTimeFormatOptions } = {
-          'yyyy-MM-dd': { year: 'numeric', month: '2-digit', day: '2-digit' },
-          'dd/MM/yyyy': { day: '2-digit', month: '2-digit', year: 'numeric' },
-          'MM/dd/yyyy': { month: '2-digit', day: '2-digit', year: 'numeric' },
-          'yyyy/MM/dd': { year: 'numeric', month: '2-digit', day: '2-digit' },
-          'dd-MM-yyyy': { day: '2-digit', month: '2-digit', year: 'numeric' },
-          'MM-dd-yyyy': { month: '2-digit', day: '2-digit', year: 'numeric' },
-          'yyyyMMdd': { year: 'numeric', month: '2-digit', day: '2-digit' },
-          'ddMMyyyy': { day: '2-digit', month: '2-digit', year: 'numeric' },
-          'MMddyyyy': { month: '2-digit', day: '2-digit', year: 'numeric' },
-          'yyyy-MM-dd HH:mm:ss': { 
-            year: 'numeric', 
-            month: '2-digit', 
-            day: '2-digit',
-            hour: '2-digit',
-            minute: '2-digit',
-            second: '2-digit'
+          "yyyy-MM-dd": { year: "numeric", month: "2-digit", day: "2-digit" },
+          "dd/MM/yyyy": { day: "2-digit", month: "2-digit", year: "numeric" },
+          "MM/dd/yyyy": { month: "2-digit", day: "2-digit", year: "numeric" },
+          "yyyy/MM/dd": { year: "numeric", month: "2-digit", day: "2-digit" },
+          "dd-MM-yyyy": { day: "2-digit", month: "2-digit", year: "numeric" },
+          "MM-dd-yyyy": { month: "2-digit", day: "2-digit", year: "numeric" },
+          yyyyMMdd: { year: "numeric", month: "2-digit", day: "2-digit" },
+          ddMMyyyy: { day: "2-digit", month: "2-digit", year: "numeric" },
+          MMddyyyy: { month: "2-digit", day: "2-digit", year: "numeric" },
+          "yyyy-MM-dd HH:mm:ss": {
+            year: "numeric",
+            month: "2-digit",
+            day: "2-digit",
+            hour: "2-digit",
+            minute: "2-digit",
+            second: "2-digit",
           },
-          'dd/MM/yyyy HH:mm:ss': {
-            day: '2-digit',
-            month: '2-digit',
-            year: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit',
-            second: '2-digit'
-          }
+          "dd/MM/yyyy HH:mm:ss": {
+            day: "2-digit",
+            month: "2-digit",
+            year: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+            second: "2-digit",
+          },
         };
-        
+
         // Try to match the format string with known patterns
         const matchedFormat = formatMap[format];
         if (matchedFormat) {
@@ -801,24 +774,24 @@ export class SpreadsheetVisualizer {
         }
 
         // If no match found, try to parse as a simple date format
-        if (format.includes('yyyy') || format.includes('MM') || format.includes('dd')) {
+        if (format.includes("yyyy") || format.includes("MM") || format.includes("dd")) {
           return {
-            year: format.includes('yyyy') ? 'numeric' : undefined,
-            month: format.includes('MM') ? '2-digit' : undefined,
-            day: format.includes('dd') ? '2-digit' : undefined,
-            hour: format.includes('HH') ? '2-digit' : undefined,
-            minute: format.includes('mm') ? '2-digit' : undefined,
-            second: format.includes('ss') ? '2-digit' : undefined
+            year: format.includes("yyyy") ? "numeric" : undefined,
+            month: format.includes("MM") ? "2-digit" : undefined,
+            day: format.includes("dd") ? "2-digit" : undefined,
+            hour: format.includes("HH") ? "2-digit" : undefined,
+            minute: format.includes("mm") ? "2-digit" : undefined,
+            second: format.includes("ss") ? "2-digit" : undefined,
           };
         }
       }
-      
+
       // For number formats, return undefined if not valid JSON
       return undefined;
     }
   }
 
-  private getFormatOptions(column: Column, type: 'number' | 'date' | 'datetime'): any {
+  private getFormatOptions(column: Column, type: "number" | "date" | "datetime"): any {
     // First try column-specific format
     if (column.format) {
       const parsedFormat = this.parseFormat(column.format, type);
@@ -827,12 +800,12 @@ export class SpreadsheetVisualizer {
 
     // Then fall back to global format
     switch (type) {
-      case 'date':
-        return this.parseFormat(this.options.dateFormat?.toString(), 'date');
-      case 'datetime':
-        return this.parseFormat(this.options.datetimeFormat?.toString(), 'date');
-      case 'number':
-        return this.parseFormat(this.options.numberFormat?.toString(), 'number');
+      case "date":
+        return this.parseFormat(this.options.dateFormat?.toString(), "date");
+      case "datetime":
+        return this.parseFormat(this.options.datetimeFormat?.toString(), "date");
+      case "number":
+        return this.parseFormat(this.options.numberFormat?.toString(), "number");
       default:
         return undefined;
     }
@@ -842,7 +815,7 @@ export class SpreadsheetVisualizer {
     if (value === null || value === undefined) {
       return {
         text: "NA",
-        style: this.options.nullStyle || { textColor: "#cc0000" }
+        style: this.options.nullStyle || { textColor: "#cc0000" },
       };
     }
 
@@ -851,13 +824,11 @@ export class SpreadsheetVisualizer {
       case "decimal":
         const numValue = Number(value);
         if (!isNaN(numValue)) {
-          const formatOptions = this.getFormatOptions(column, 'number');
-          const formattedValue = formatOptions 
-            ? new Intl.NumberFormat(undefined, formatOptions).format(numValue)
-            : numValue.toString();
+          const formatOptions = this.getFormatOptions(column, "number");
+          const formattedValue = formatOptions ? new Intl.NumberFormat(undefined, formatOptions).format(numValue) : numValue.toString();
           return {
             text: formattedValue,
-            style: this.options.numericStyle || { textAlign: "right", textColor: "#0066cc" }
+            style: this.options.numericStyle || { textAlign: "right", textColor: "#0066cc" },
           };
         }
         break;
@@ -869,12 +840,12 @@ export class SpreadsheetVisualizer {
           const formatOptions = this.getFormatOptions(column, column.dataType);
           const formattedValue = formatOptions
             ? new Intl.DateTimeFormat(undefined, formatOptions).format(dateValue)
-            : column.dataType === "date" 
-              ? dateValue.toLocaleDateString()
-              : dateValue.toLocaleString();
+            : column.dataType === "date"
+            ? dateValue.toLocaleDateString()
+            : dateValue.toLocaleString();
           return {
             text: formattedValue,
-            style: this.options.dateStyle || { textAlign: "right", textColor: "#006633" }
+            style: this.options.dateStyle || { textAlign: "right", textColor: "#006633" },
           };
         }
         break;
@@ -882,21 +853,21 @@ export class SpreadsheetVisualizer {
       case "boolean":
         return {
           text: value ? "Yes" : "No",
-          style: { textAlign: "center" }
+          style: { textAlign: "center" },
         };
 
       case "string":
       default:
         return {
           text: value.toString(),
-          style: {}
+          style: {},
         };
     }
 
     // If type conversion fails, treat as string
     return {
       text: value.toString(),
-      style: {}
+      style: {},
     };
   }
 
@@ -913,17 +884,14 @@ export class SpreadsheetVisualizer {
 
   private updateCanvasSize(): void {
     const { maxHeight, maxWidth, minHeight, minWidth, height, width } = this.options;
-    
+
     // If fixed dimensions are specified, use them
     if (height !== undefined) {
       this.canvas.height = height;
     } else {
       // Calculate height based on container and constraints
       const containerHeight = this.canvas.parentElement?.clientHeight || window.innerHeight;
-      this.canvas.height = Math.min(
-        Math.max(containerHeight, minHeight || 0),
-        maxHeight || containerHeight
-      );
+      this.canvas.height = Math.min(Math.max(containerHeight, minHeight || 0), maxHeight || containerHeight);
     }
 
     if (width !== undefined) {
@@ -931,10 +899,7 @@ export class SpreadsheetVisualizer {
     } else {
       // Calculate width based on container and constraints
       const containerWidth = this.canvas.parentElement?.clientWidth || window.innerWidth;
-      this.canvas.width = Math.min(
-        Math.max(containerWidth, minWidth || 0),
-        maxWidth || containerWidth
-      );
+      this.canvas.width = Math.min(Math.max(containerWidth, minWidth || 0), maxWidth || containerWidth);
     }
 
     // Update canvas style to maintain aspect ratio and prevent stretching

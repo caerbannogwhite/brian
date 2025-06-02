@@ -1,4 +1,5 @@
-import { SpreadsheetVisualizer, Column, DataProvider } from './SpreadsheetVisualizer';
+import { datasetDm, getColumns, type CdiscDataset } from "./data.ts";
+import { SpreadsheetVisualizer, Column, DataProvider } from "./SpreadsheetVisualizer";
 
 // Example data provider
 class ExampleDataProvider implements DataProvider {
@@ -32,59 +33,46 @@ class ExampleDataProvider implements DataProvider {
 
   async fetchData(startRow: number, endRow: number, startCol: number, endCol: number): Promise<any[][]> {
     // Simulate network delay
-    await new Promise(resolve => setTimeout(resolve, 100));
-    
-    return this.data.slice(startRow, endRow).map(row => 
-      row.slice(startCol, endCol + 1)
-    );
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    return datasetDm.rows.slice(startRow, endRow).map((row) => row.slice(startCol, endCol + 1));
   }
 
   async getTotalRows(): Promise<number> {
-    return this.totalRows;
+    return datasetDm.rows.length;
   }
 
   async getTotalColumns(): Promise<number> {
-    return this.totalColumns;
+    return datasetDm.columns.length;
   }
 }
 
 // Example columns
-const columns: Column[] = [
-  { header: "String", key: "string", dataType: "string" },
-  { header: "Number", key: "number", dataType: "decimal", format: '{"minimumFractionDigits": 2, "maximumFractionDigits": 2}' },
-  { header: "Date", key: "date", dataType: "date", format: 'yyyy-MM-dd' },
-  { header: "Boolean", key: "boolean", dataType: "boolean" },
-  { header: "String 2", key: "string2", dataType: "string" },
-  { header: "Number 2", key: "number2", dataType: "decimal" },
-  { header: "Date 2", key: "date2", dataType: "datetime" },
-  { header: "Boolean 2", key: "boolean2", dataType: "boolean" },
-  { header: "String 3", key: "string3", dataType: "string" },
-  { header: "Number 3", key: "number3", dataType: "decimal" }
-];
+const columns: Column[] = getColumns(datasetDm as CdiscDataset);
 
 // Initialize the spreadsheet
 async function initSpreadsheet() {
-  const container = document.getElementById('spreadsheet-container');
+  const container = document.getElementById("spreadsheet-container");
   if (!container) return;
 
-  const canvas = document.createElement('canvas');
+  const canvas = document.createElement("canvas");
   container.appendChild(canvas);
 
   const dataProvider = new ExampleDataProvider();
-  
+
   new SpreadsheetVisualizer(canvas, columns, dataProvider, {
     // Viewport options
     maxHeight: 800,
     maxWidth: 1200,
     minHeight: 400,
     minWidth: 600,
-    
+
     // Format options
-    dateFormat: 'yyyy-MM-dd',
-    datetimeFormat: 'yyyy-MM-dd HH:mm:ss',
-    numberFormat: { minimumFractionDigits: 2, maximumFractionDigits: 2 }
+    dateFormat: "yyyy-MM-dd",
+    datetimeFormat: "yyyy-MM-dd HH:mm:ss",
+    numberFormat: { minimumFractionDigits: 2, maximumFractionDigits: 2 },
   });
 }
 
 // Start the application
-initSpreadsheet().catch(console.error); 
+initSpreadsheet().catch(console.error);
