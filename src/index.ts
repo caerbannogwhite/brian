@@ -66,6 +66,10 @@ document.addEventListener("DOMContentLoaded", () => {
       },
       borderColor: "#dee2e6",
       borderWidth: 1,
+
+      dateFormat: "yyyy-MM-dd",
+      datetimeFormat: "yyyy-MM-dd HH:mm:ss",
+      numberFormat: { minimumFractionDigits: 2, maximumFractionDigits: 2 },
     });
   }
 });

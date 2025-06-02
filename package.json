@@ -1,15 +1,16 @@
 {
-  "name": "rough-spreadsheet",
-  "version": "0.1.0",
+  "name": "matrix-view",
   "private": true,
+  "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "NODE_ENV=development bun run --hot src/server.ts",
-    "build": "NODE_ENV=production bun build ./src/index.ts --outdir ./dist --target browser --minify",
-    "start": "NODE_ENV=production bun run src/server.ts"
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
   },
   "devDependencies": {
-    "bun-types": "^1.2.15",
-    "typescript": "^5.3.3"
+    "@types/node": "^20.11.19",
+    "typescript": "^5.3.3",
+    "vite": "^6.3.5"
   }
 }
