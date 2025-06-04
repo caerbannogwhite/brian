@@ -33,6 +33,7 @@ export interface SpreadsheetOptions {
   rowHeaderWidth?: number;
 
   // Style options
+  borderWidth?: number;
   fontFamily?: string;
   fontSize?: number;
   headerFontSize?: number;

@@ -1,6 +1,35 @@
-import { Column, SpreadsheetOptions, DataProvider } from './types';
+import {
+  DEFAULT_MAX_WIDTH,
+  DEFAULT_MIN_HEIGHT,
+  DEFAULT_MIN_WIDTH,
+  DEFAULT_CELL_HEIGHT,
+  DEFAULT_CELL_PADDING,
+  DEFAULT_ROW_HEADER_WIDTH,
+  DEFAULT_MIN_CELL_WIDTH,
+  DEFAULT_FONT_FAMILY,
+  DEFAULT_HEADER_FONT_SIZE,
+  DEFAULT_FONT_SIZE,
+  DEFAULT_HEADER_BACKGROUND_COLOR,
+  DEFAULT_HEADER_TEXT_COLOR,
+  DEFAULT_CELL_BACKGROUND_COLOR,
+  DEFAULT_CELL_TEXT_COLOR,
+  DEFAULT_BORDER_COLOR,
+  DEFAULT_SELECTION_COLOR,
+  DEFAULT_HOVER_COLOR,
+  DEFAULT_SCROLLBAR_THUMB_COLOR,
+  DEFAULT_SCROLLBAR_HOVER_COLOR,
+  DEFAULT_SCROLLBAR_COLOR,
+  DEFAULT_SCROLLBAR_WIDTH,
+  DEFAULT_DATE_FORMAT,
+  DEFAULT_DATETIME_FORMAT,
+  DEFAULT_NUMBER_FORMAT,
+  DEFAULT_BORDER_WIDTH,
+} from "../dafults";
+import { DEFAULT_MAX_HEIGHT } from "../dafults";
+import { Column, SpreadsheetOptions, DataProvider } from "./types";
+import { throttle } from "./utils/throttle";
 
-type RequiredSpreadsheetOptions = Omit<Required<SpreadsheetOptions>, 'height' | 'width'> & {
+type RequiredSpreadsheetOptions = Omit<Required<SpreadsheetOptions>, "height" | "width"> & {
   height: number;
   width: number;
 };
@@ -11,6 +40,7 @@ export class SpreadsheetVisualizer {
   private columns: Column[];
   private dataProvider: DataProvider;
   private options: RequiredSpreadsheetOptions;
+  private throttledMouseMove: (event: MouseEvent) => void;
 
   // State variables
   private scrollX = 0;
@@ -35,66 +65,65 @@ export class SpreadsheetVisualizer {
   private visibleColumns = 0;
   private dataCache: Map<string, any[][]> = new Map();
 
-  constructor(
-    canvas: HTMLCanvasElement,
-    columns: Column[],
-    dataProvider: DataProvider,
-    options: Partial<SpreadsheetOptions> = {}
-  ) {
+  constructor(canvas: HTMLCanvasElement, columns: Column[], dataProvider: DataProvider, options: Partial<SpreadsheetOptions> = {}) {
     this.canvas = canvas;
-    this.ctx = canvas.getContext('2d')!;
+    this.ctx = canvas.getContext("2d")!;
     this.columns = columns;
     this.dataProvider = dataProvider;
 
     // Get container dimensions
     const container = canvas.parentElement;
     const containerRect = container?.getBoundingClientRect();
-    const containerWidth = containerRect?.width ?? options.maxWidth ?? 1200;
-    const containerHeight = containerRect?.height ?? options.maxHeight ?? 800;
+    const containerWidth = containerRect?.width ?? options.maxWidth ?? DEFAULT_MAX_WIDTH;
+    const containerHeight = containerRect?.height ?? options.maxHeight ?? DEFAULT_MAX_HEIGHT;
 
     // Set default options
     this.options = {
       // Viewport options
-      maxHeight: options.maxHeight ?? 800,
-      maxWidth: options.maxWidth ?? 1200,
-      minHeight: options.minHeight ?? 400,
-      minWidth: options.minWidth ?? 600,
+      maxHeight: options.maxHeight ?? DEFAULT_MAX_HEIGHT,
+      maxWidth: options.maxWidth ?? DEFAULT_MAX_WIDTH,
+      minHeight: options.minHeight ?? DEFAULT_MIN_HEIGHT,
+      minWidth: options.minWidth ?? DEFAULT_MIN_WIDTH,
       height: options.height ?? containerWidth,
       width: options.width ?? containerHeight,
 
       // Cell options
-      cellHeight: options.cellHeight ?? 24,
-      minCellWidth: options.minCellWidth ?? 100,
-      cellPadding: options.cellPadding ?? 8,
-      rowHeaderWidth: options.rowHeaderWidth ?? 60,
+      cellHeight: options.cellHeight ?? DEFAULT_CELL_HEIGHT,
+      minCellWidth: options.minCellWidth ?? DEFAULT_MIN_CELL_WIDTH,
+      cellPadding: options.cellPadding ?? DEFAULT_CELL_PADDING,
+      rowHeaderWidth: options.rowHeaderWidth ?? DEFAULT_ROW_HEADER_WIDTH,
 
       // Style options
-      fontFamily: options.fontFamily ?? 'Consolas, monospace',
-      fontSize: options.fontSize ?? 14,
-      headerFontSize: options.headerFontSize ?? 14,
-      headerBackgroundColor: options.headerBackgroundColor ?? '#f0f0f0',
-      headerTextColor: options.headerTextColor ?? '#333',
-      cellBackgroundColor: options.cellBackgroundColor ?? '#fff',
-      cellTextColor: options.cellTextColor ?? '#000',
-      borderColor: options.borderColor ?? '#ddd',
-      selectionColor: options.selectionColor ?? 'rgba(0, 120, 215, 0.2)',
-      hoverColor: options.hoverColor ?? 'rgba(0, 120, 215, 0.1)',
+      borderWidth: options.borderWidth ?? DEFAULT_BORDER_WIDTH,
+      fontFamily: options.fontFamily ?? DEFAULT_FONT_FAMILY,
+      fontSize: options.fontSize ?? DEFAULT_FONT_SIZE,
+      headerFontSize: options.headerFontSize ?? DEFAULT_HEADER_FONT_SIZE,
+      headerBackgroundColor: options.headerBackgroundColor ?? DEFAULT_HEADER_BACKGROUND_COLOR,
+      headerTextColor: options.headerTextColor ?? DEFAULT_HEADER_TEXT_COLOR,
+      cellBackgroundColor: options.cellBackgroundColor ?? DEFAULT_CELL_BACKGROUND_COLOR,
+      cellTextColor: options.cellTextColor ?? DEFAULT_CELL_TEXT_COLOR,
+      borderColor: options.borderColor ?? DEFAULT_BORDER_COLOR,
+      selectionColor: options.selectionColor ?? DEFAULT_SELECTION_COLOR,
+      hoverColor: options.hoverColor ?? DEFAULT_HOVER_COLOR,
 
       // Scrollbar options
-      scrollbarWidth: options.scrollbarWidth ?? 12,
-      scrollbarColor: options.scrollbarColor ?? '#e0e0e0',
-      scrollbarThumbColor: options.scrollbarThumbColor ?? '#b0b0b0',
-      scrollbarHoverColor: options.scrollbarHoverColor ?? '#909090',
+      scrollbarWidth: options.scrollbarWidth ?? DEFAULT_SCROLLBAR_WIDTH,
+      scrollbarColor: options.scrollbarColor ?? DEFAULT_SCROLLBAR_COLOR,
+      scrollbarThumbColor: options.scrollbarThumbColor ?? DEFAULT_SCROLLBAR_THUMB_COLOR,
+      scrollbarHoverColor: options.scrollbarHoverColor ?? DEFAULT_SCROLLBAR_HOVER_COLOR,
 
       // Format options
-      dateFormat: options.dateFormat ?? 'yyyy-MM-dd',
-      datetimeFormat: options.datetimeFormat ?? 'yyyy-MM-dd HH:mm:ss',
-      numberFormat: options.numberFormat ?? { minimumFractionDigits: 2, maximumFractionDigits: 2 }
+      dateFormat: options.dateFormat ?? DEFAULT_DATE_FORMAT,
+      datetimeFormat: options.datetimeFormat ?? DEFAULT_DATETIME_FORMAT,
+      numberFormat: options.numberFormat ?? DEFAULT_NUMBER_FORMAT,
     };
 
     // Apply constraints
     this.options.height = Math.min(Math.max(this.options.height, this.options.minHeight), this.options.maxHeight);
     this.options.width = Math.min(Math.max(this.options.width, this.options.minWidth), this.options.maxWidth);
+
+    // Initialize throttled mouse move handler (16ms = ~60fps)
+    this.throttledMouseMove = throttle(this.handleMouseMove.bind(this), 60);
 
     this.setupEventListeners();
     this.updateCanvasSize();
@@ -104,17 +133,17 @@ export class SpreadsheetVisualizer {
 
   private setupEventListeners() {
     // Mouse events
-    this.canvas.addEventListener('mousedown', (event) => this.handleMouseDown(event).catch(console.error));
-    this.canvas.addEventListener('mousemove', (event) => this.handleMouseMove(event).catch(console.error));
-    this.canvas.addEventListener('mouseup', this.handleMouseUp.bind(this));
-    this.canvas.addEventListener('mouseleave', this.handleMouseLeave.bind(this));
-    this.canvas.addEventListener('wheel', (event) => this.handleWheel(event).catch(console.error));
+    this.canvas.addEventListener("mousedown", (event) => this.handleMouseDown(event).catch(console.error));
+    this.canvas.addEventListener("mousemove", this.throttledMouseMove);
+    this.canvas.addEventListener("mouseup", this.handleMouseUp.bind(this));
+    this.canvas.addEventListener("mouseleave", this.handleMouseLeave.bind(this));
+    this.canvas.addEventListener("wheel", (event) => this.handleWheel(event).catch(console.error));
 
     // Keyboard events
-    window.addEventListener('keydown', (event) => this.handleKeyDown(event).catch(console.error));
+    window.addEventListener("keydown", (event) => this.handleKeyDown(event).catch(console.error));
 
     // Window events
-    window.addEventListener('resize', () => this.handleResize().catch(console.error));
+    window.addEventListener("resize", () => this.handleResize().catch(console.error));
   }
 
   private async updateCanvasSize() {
@@ -148,7 +177,7 @@ export class SpreadsheetVisualizer {
     const hasScrollbar = minTotalWidth > availableWidth;
 
     // Calculate minimum widths based on content
-    this.columnWidths = this.columns.map(col => {
+    this.columnWidths = this.columns.map((col) => {
       const headerWidth = this.ctx.measureText(col.header).width + this.options.cellPadding * 2;
       return Math.max(headerWidth, this.options.minCellWidth);
     });
@@ -160,7 +189,7 @@ export class SpreadsheetVisualizer {
     if (this.totalWidth < availableWidth) {
       const extraWidth = availableWidth - this.totalWidth;
       const totalMinWidth = this.columnWidths.reduce((sum, width) => sum + width, 0);
-      this.columnWidths = this.columnWidths.map(width => width + (width / totalMinWidth) * extraWidth);
+      this.columnWidths = this.columnWidths.map((width) => width + (width / totalMinWidth) * extraWidth);
       this.totalWidth = availableWidth;
     }
 
@@ -177,16 +206,10 @@ export class SpreadsheetVisualizer {
 
     // Calculate visible area
     const visibleStartRow = Math.floor(this.scrollY / this.options.cellHeight);
-    const visibleEndRow = Math.min(
-      visibleStartRow + Math.ceil(height / this.options.cellHeight),
-      await this.dataProvider.getTotalRows()
-    );
+    const visibleEndRow = Math.min(visibleStartRow + Math.ceil(height / this.options.cellHeight), await this.dataProvider.getTotalRows());
 
     const visibleStartCol = Math.floor(this.scrollX / (this.totalWidth / this.columns.length));
-    const visibleEndCol = Math.min(
-      visibleStartCol + this.visibleColumns,
-      await this.dataProvider.getTotalColumns()
-    );
+    const visibleEndCol = Math.min(visibleStartCol + this.visibleColumns, await this.dataProvider.getTotalColumns());
 
     // Draw cells
     await this.drawCells(visibleStartRow, visibleEndRow, visibleStartCol, visibleEndCol);
@@ -233,9 +256,9 @@ export class SpreadsheetVisualizer {
         startRow: cell.row,
         endRow: cell.row,
         startCol: cell.col,
-        endCol: cell.col
+        endCol: cell.col,
       };
-      this.draw();
+      // this.draw();
     }
   }
 
@@ -244,43 +267,47 @@ export class SpreadsheetVisualizer {
     const x = event.clientX - rect.left;
     const y = event.clientY - rect.top;
 
+    let needsRedraw = false;
+    let newHoverCell: { row: number; col: number } | null = null;
+
     // Handle scrollbar dragging
     if (this.isDraggingVerticalScrollbar) {
       const deltaY = y - this.dragStartY;
       const scrollRatio = deltaY / (this.canvas.height - this.options.scrollbarWidth);
       this.scrollY = Math.max(0, this.lastScrollY + scrollRatio * this.totalHeight);
-      this.draw();
-      return;
-    }
-
-    if (this.isDraggingHorizontalScrollbar) {
+      needsRedraw = true;
+    } else if (this.isDraggingHorizontalScrollbar) {
       const deltaX = x - this.dragStartX;
       const scrollRatio = deltaX / (this.canvas.width - this.options.scrollbarWidth);
       this.scrollX = Math.max(0, this.lastScrollX + scrollRatio * this.totalWidth);
-      this.draw();
-      return;
-    }
-
-    // Update hover state
-    const cell = await this.getCellAtPosition(x, y);
-    if (cell) {
-      this.hoveredCell = cell;
-      this.isHoveringVerticalScrollbar = false;
-      this.isHoveringHorizontalScrollbar = false;
+      needsRedraw = true;
     } else {
-      this.hoveredCell = null;
-      this.isHoveringVerticalScrollbar = this.isOverVerticalScrollbar(x, y);
-      this.isHoveringHorizontalScrollbar = this.isOverHorizontalScrollbar(x, y);
+      // Update hover state
+      newHoverCell = await this.getCellAtPosition(x, y);
+      const hoverChanged = newHoverCell?.row !== this.hoveredCell?.row || newHoverCell?.col !== this.hoveredCell?.col;
+
+      if (hoverChanged) {
+        this.hoveredCell = newHoverCell;
+        this.isHoveringVerticalScrollbar = this.isOverVerticalScrollbar(x, y);
+        this.isHoveringHorizontalScrollbar = this.isOverHorizontalScrollbar(x, y);
+        needsRedraw = true;
+      }
+
+      // Update selection if dragging
+      if (this.isDragging && newHoverCell && this.selectedCells) {
+        const selectionChanged = newHoverCell.row !== this.selectedCells.endRow || newHoverCell.col !== this.selectedCells.endCol;
+
+        if (selectionChanged) {
+          this.selectedCells.endRow = newHoverCell.row;
+          this.selectedCells.endCol = newHoverCell.col;
+          needsRedraw = true;
+        }
+      }
     }
 
-    // Update selection if dragging
-    if (this.isDragging && cell && this.selectedCells) {
-      this.selectedCells.endRow = cell.row;
-      this.selectedCells.endCol = cell.col;
-      this.draw();
+    if (needsRedraw) {
+      await this.draw();
     }
-
-    this.draw();
   }
 
   private handleMouseUp() {
@@ -325,53 +352,53 @@ export class SpreadsheetVisualizer {
     const col = event.shiftKey ? endCol : startCol;
 
     switch (event.key) {
-      case 'ArrowUp':
+      case "ArrowUp":
         if (row > 0) {
           this.selectedCells = {
             startRow: event.shiftKey ? startRow : row - 1,
             endRow: event.shiftKey ? row - 1 : row - 1,
             startCol: event.shiftKey ? startCol : col,
-            endCol: event.shiftKey ? endCol : col
+            endCol: event.shiftKey ? endCol : col,
           };
           this.scrollY = Math.max(0, (row - 1) * this.options.cellHeight - this.canvas.height / 2);
         }
         break;
 
-      case 'ArrowDown':
+      case "ArrowDown":
         this.selectedCells = {
           startRow: event.shiftKey ? startRow : row + 1,
           endRow: event.shiftKey ? row + 1 : row + 1,
           startCol: event.shiftKey ? startCol : col,
-          endCol: event.shiftKey ? endCol : col
+          endCol: event.shiftKey ? endCol : col,
         };
         this.scrollY = Math.max(0, (row + 1) * this.options.cellHeight - this.canvas.height / 2);
         break;
 
-      case 'ArrowLeft':
+      case "ArrowLeft":
         if (col > 0) {
           this.selectedCells = {
             startRow: event.shiftKey ? startRow : row,
             endRow: event.shiftKey ? endRow : row,
             startCol: event.shiftKey ? startCol : col - 1,
-            endCol: event.shiftKey ? col - 1 : col - 1
+            endCol: event.shiftKey ? col - 1 : col - 1,
           };
           this.scrollX = Math.max(0, this.getColumnOffset(col - 1) - this.canvas.width / 2);
         }
         break;
 
-      case 'ArrowRight':
+      case "ArrowRight":
         if (col < this.columns.length - 1) {
           this.selectedCells = {
             startRow: event.shiftKey ? startRow : row,
             endRow: event.shiftKey ? endRow : row,
             startCol: event.shiftKey ? startCol : col + 1,
-            endCol: event.shiftKey ? col + 1 : col + 1
+            endCol: event.shiftKey ? col + 1 : col + 1,
           };
           this.scrollX = Math.max(0, this.getColumnOffset(col + 1) - this.canvas.width / 2);
         }
         break;
 
-      case 'c':
+      case "c":
         if (event.ctrlKey || event.metaKey) {
           this.copySelection();
         }
@@ -409,34 +436,37 @@ export class SpreadsheetVisualizer {
       Math.max(startCol, endCol) + 1
     );
 
-    const text = data.map(row =>
-      row.map(cell => this.formatCellValue(cell)).join('\t')
-    ).join('\n');
+    const text = data.map((row) => row.map((cell) => this.formatCellValue(cell)).join("\t")).join("\n");
 
     try {
       await navigator.clipboard.writeText(text);
     } catch (err) {
-      console.error('Failed to copy to clipboard:', err);
+      console.error("Failed to copy to clipboard:", err);
     }
   }
 
   private formatCellValue(value: any): string {
-    if (value === null || value === undefined) return 'NA';
-    if (typeof value === 'string') return value;
-    if (typeof value === 'number') return value.toLocaleString(undefined, this.options.numberFormat);
+    if (value === null || value === undefined) return "NA";
+    if (typeof value === "string") return value;
+    if (typeof value === "number") return value.toLocaleString(undefined, this.options.numberFormat);
     if (value instanceof Date) {
-      const format = value.getHours() === 0 && value.getMinutes() === 0
-        ? this.options.dateFormat
-        : this.options.datetimeFormat;
-      return format.replace(/yyyy|MM|dd|HH|mm|ss/g, match => {
+      const format = value.getHours() === 0 && value.getMinutes() === 0 ? this.options.dateFormat : this.options.datetimeFormat;
+      return format.replace(/yyyy|MM|dd|HH|mm|ss/g, (match) => {
         switch (match) {
-          case 'yyyy': return value.getFullYear().toString();
-          case 'MM': return (value.getMonth() + 1).toString().padStart(2, '0');
-          case 'dd': return value.getDate().toString().padStart(2, '0');
-          case 'HH': return value.getHours().toString().padStart(2, '0');
-          case 'mm': return value.getMinutes().toString().padStart(2, '0');
-          case 'ss': return value.getSeconds().toString().padStart(2, '0');
-          default: return match;
+          case "yyyy":
+            return value.getFullYear().toString();
+          case "MM":
+            return (value.getMonth() + 1).toString().padStart(2, "0");
+          case "dd":
+            return value.getDate().toString().padStart(2, "0");
+          case "HH":
+            return value.getHours().toString().padStart(2, "0");
+          case "mm":
+            return value.getMinutes().toString().padStart(2, "0");
+          case "ss":
+            return value.getSeconds().toString().padStart(2, "0");
+          default:
+            return match;
         }
       });
     }
@@ -490,7 +520,7 @@ export class SpreadsheetVisualizer {
     // Draw column headers
     ctx.font = `${this.options.headerFontSize}px ${this.options.fontFamily}`;
     ctx.fillStyle = this.options.headerTextColor;
-    ctx.textBaseline = 'middle';
+    ctx.textBaseline = "middle";
 
     let x = this.options.rowHeaderWidth - this.scrollX;
     for (let col = startCol; col < endCol; col++) {
@@ -508,7 +538,7 @@ export class SpreadsheetVisualizer {
     }
 
     // Draw row headers
-    ctx.textAlign = 'right';
+    ctx.textAlign = "right";
     let y = this.options.cellHeight - this.scrollY;
     for (let row = startRow; row < endRow; row++) {
       if (y + this.options.cellHeight > 0 && y < height) {
@@ -522,7 +552,7 @@ export class SpreadsheetVisualizer {
 
     // Draw cells
     const data = await this.dataProvider.fetchData(startRow, endRow, startCol, endCol);
-    ctx.textAlign = 'left';
+    ctx.textAlign = "left";
     ctx.font = `${this.options.fontSize}px ${this.options.fontFamily}`;
     ctx.fillStyle = this.options.cellTextColor;
 
@@ -547,11 +577,11 @@ export class SpreadsheetVisualizer {
           const textY = y + this.options.cellHeight / 2;
 
           // Align text based on data type
-          if (column.dataType === 'number' || column.dataType === 'date' || column.dataType === 'datetime') {
-            ctx.textAlign = 'right';
+          if (column.dataType === "number" || column.dataType === "date" || column.dataType === "datetime") {
+            ctx.textAlign = "right";
             ctx.fillText(text, x + cellWidth - this.options.cellPadding, textY);
           } else {
-            ctx.textAlign = 'left';
+            ctx.textAlign = "left";
             ctx.fillText(text, textX, textY);
           }
 
@@ -628,9 +658,10 @@ export class SpreadsheetVisualizer {
       ctx.fillRect(scrollbarX, 0, this.options.scrollbarWidth, height);
 
       // Draw thumb
-      ctx.fillStyle = this.isHoveringVerticalScrollbar || this.isDraggingVerticalScrollbar
-        ? this.options.scrollbarHoverColor
-        : this.options.scrollbarThumbColor;
+      ctx.fillStyle =
+        this.isHoveringVerticalScrollbar || this.isDraggingVerticalScrollbar
+          ? this.options.scrollbarHoverColor
+          : this.options.scrollbarThumbColor;
       ctx.fillRect(scrollbarX, scrollbarY, this.options.scrollbarWidth, scrollbarHeight);
     }
 
@@ -645,10 +676,11 @@ export class SpreadsheetVisualizer {
       ctx.fillRect(0, scrollbarY, width, this.options.scrollbarWidth);
 
       // Draw thumb
-      ctx.fillStyle = this.isHoveringHorizontalScrollbar || this.isDraggingHorizontalScrollbar
-        ? this.options.scrollbarHoverColor
-        : this.options.scrollbarThumbColor;
+      ctx.fillStyle =
+        this.isHoveringHorizontalScrollbar || this.isDraggingHorizontalScrollbar
+          ? this.options.scrollbarHoverColor
+          : this.options.scrollbarThumbColor;
       ctx.fillRect(scrollbarX, scrollbarY, scrollbarWidth, this.options.scrollbarWidth);
     }
   }
-} 
+}
