@@ -1,4 +1,4 @@
-import { Column, CellStyle, SpreadsheetOptions } from '../types';
+import { Column, CellStyle, SpreadsheetOptions } from "../types";
 
 export function parseFormat(format: string | undefined, type: "number" | "date" | "datetime"): any {
   if (!format) return undefined;
@@ -87,9 +87,7 @@ export function formatCellValue(value: any, column: Column, options: Spreadsheet
       const numValue = Number(value);
       if (!isNaN(numValue)) {
         const formatOptions = getFormatOptions(column, "number", options);
-        const formattedValue = formatOptions 
-          ? new Intl.NumberFormat(undefined, formatOptions).format(numValue) 
-          : numValue.toString();
+        const formattedValue = formatOptions ? new Intl.NumberFormat(undefined, formatOptions).format(numValue) : numValue.toString();
         return {
           text: formattedValue,
           style: options.numericStyle || { textAlign: "right", textColor: "#0066cc" },
@@ -132,4 +130,4 @@ export function formatCellValue(value: any, column: Column, options: Spreadsheet
     text: value.toString(),
     style: {},
   };
-} 
+}

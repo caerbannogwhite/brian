@@ -1,4 +1,4 @@
-import { ScrollbarState } from '../types';
+import { ScrollbarState } from "../types";
 
 interface ScrollbarOptions {
   width: number;
@@ -149,4 +149,4 @@ export function handleScrollbarMouseMove(
   }
 
   return { newScrollY, newScrollX };
-} 
+}

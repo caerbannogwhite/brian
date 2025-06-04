@@ -1,5 +1,6 @@
-import { Column, CellStyle, CellPosition, SpreadsheetOptions } from '../types';
-import { formatCellValue } from './cellFormatting';
+import { DEFAULT_BORDER_COLOR, DEFAULT_BORDER_WIDTH } from "@/components/dafults";
+import { Column, CellStyle, CellPosition, SpreadsheetOptions } from "../types";
+import { formatCellValue } from "./cellFormatting";
 
 interface DrawingOptions extends SpreadsheetOptions {
   scrollY: number;
@@ -8,6 +9,10 @@ interface DrawingOptions extends SpreadsheetOptions {
   columnWidths: number[];
   selectionColor: string;
   selectionBorderColor: string;
+  borderColor: string;
+  borderWidth: number;
+  cellHeight: number;
+  headerHeight: number;
   hoverColor: string;
   hoverBorderColor: string;
 }
@@ -29,7 +34,8 @@ export function drawCell(
   column: Column | undefined,
   options: SpreadsheetOptions
 ): void {
-  const { borderColor, borderWidth } = options;
+  const borderColor = options.borderColor ?? DEFAULT_BORDER_COLOR;
+  const borderWidth = options.borderWidth ?? DEFAULT_BORDER_WIDTH;
 
   // Draw cell background
   ctx.fillStyle = style.backgroundColor || "#ffffff";
@@ -146,4 +152,4 @@ export function drawHover(
   ctx.strokeStyle = options.hoverBorderColor;
   ctx.lineWidth = 1;
   ctx.strokeRect(x, rowY, width, height);
-} 
+}

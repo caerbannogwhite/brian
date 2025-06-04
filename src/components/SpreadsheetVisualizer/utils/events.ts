@@ -1,5 +1,5 @@
-import { CellPosition, SpreadsheetOptions } from '../types';
-
+import { CellPosition, SpreadsheetOptions } from "../types";
+import { DEFAULT_CELL_HEIGHT } from "@/components/dafults";
 interface ExtendedSpreadsheetOptions extends SpreadsheetOptions {
   scrollY: number;
   scrollX: number;
@@ -56,7 +56,7 @@ export function handleMouseLeave(options: EventOptions): void {
 export function handleWheel(e: WheelEvent, options: EventOptions): void {
   e.preventDefault();
 
-  const { cellHeight } = options.options;
+  const cellHeight = options.options.cellHeight ?? DEFAULT_CELL_HEIGHT;
   const deltaY = e.deltaY;
   const deltaX = e.deltaX;
 
@@ -91,7 +91,7 @@ export function handleKeyDown(e: KeyboardEvent, options: EventOptions): void {
   }
 
   // Handle arrow keys for navigation
-  const { cellHeight } = options.options;
+  const cellHeight = options.options.cellHeight ?? DEFAULT_CELL_HEIGHT;
   let newScrollY = options.options.scrollY;
   let newScrollX = options.options.scrollX;
 
@@ -100,10 +100,7 @@ export function handleKeyDown(e: KeyboardEvent, options: EventOptions): void {
       newScrollY = Math.max(0, options.options.scrollY - cellHeight);
       break;
     case "ArrowDown":
-      newScrollY = Math.min(
-        options.options.totalRows * cellHeight - options.canvas.height,
-        options.options.scrollY + cellHeight
-      );
+      newScrollY = Math.min(options.options.totalRows * cellHeight - options.canvas.height, options.options.scrollY + cellHeight);
       break;
     case "ArrowLeft":
       newScrollX = Math.max(0, options.options.scrollX - 50);
@@ -162,4 +159,4 @@ export function setupEventListeners(canvas: HTMLCanvasElement, options: EventOpt
     canvas.removeEventListener("wheel", wheelHandler);
     document.removeEventListener("keydown", keyDownHandler);
   };
-} 
+}
