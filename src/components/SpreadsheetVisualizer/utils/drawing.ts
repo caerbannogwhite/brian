@@ -153,3 +153,7 @@ export function drawHover(
   ctx.lineWidth = 1;
   ctx.strokeRect(x, rowY, width, height);
 }
+
+export function minMax(value: number, min: number, max: number): number {
+  return value < min ? min : value > max ? max : value;
+}

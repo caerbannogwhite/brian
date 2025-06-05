@@ -1,5 +1,5 @@
-import { DataProvider } from '../../components/SpreadsheetVisualizer/types';
-import { CdiscDataset } from '../types';
+import { Column, DataProvider } from "../../components/SpreadsheetVisualizer/types";
+import { CdiscDataset, getColumns } from "../types";
 
 export class CdiscDataProvider implements DataProvider {
   private dataset: CdiscDataset;
@@ -15,6 +15,10 @@ export class CdiscDataProvider implements DataProvider {
     return this.dataset.rows.slice(startRow, endRow).map((row: any[]) => row.slice(startCol, endCol + 1));
   }
 
+  async getColumns(): Promise<Column[]> {
+    return getColumns(this.dataset);
+  }
+
   async getTotalRows(): Promise<number> {
     return this.dataset.rows.length;
   }
@@ -22,4 +26,4 @@ export class CdiscDataProvider implements DataProvider {
   async getTotalColumns(): Promise<number> {
     return this.dataset.columns.length;
   }
-} 
+}

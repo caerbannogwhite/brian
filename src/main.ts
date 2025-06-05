@@ -12,9 +12,8 @@ async function initSpreadsheet() {
   container.appendChild(canvas);
 
   const dataProvider = new CdiscDataProvider(datasetDm as CdiscDataset);
-  const columns = getColumns(datasetDm as CdiscDataset);
 
-  new SpreadsheetVisualizer(canvas, columns, dataProvider, {
+  const spreadsheetVisualizer = new SpreadsheetVisualizer(canvas, dataProvider, {
     // Viewport options
     maxHeight: 800,
     maxWidth: 1200,
@@ -26,6 +25,8 @@ async function initSpreadsheet() {
     datetimeFormat: "yyyy-MM-dd HH:mm:ss",
     numberFormat: { minimumFractionDigits: 2, maximumFractionDigits: 2 },
   });
+
+  await spreadsheetVisualizer.initialize();
 }
 
 // Start the application

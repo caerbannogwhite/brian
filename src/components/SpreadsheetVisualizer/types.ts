@@ -1,7 +1,7 @@
 export interface Column {
   header: string;
   key: string;
-  dataType: 'string' | 'number' | 'date' | 'datetime' | 'boolean' | 'null';
+  dataType: "string" | "number" | "date" | "datetime" | "boolean" | "null";
   format?: string | Intl.NumberFormatOptions;
 }
 
@@ -59,6 +59,7 @@ export interface SpreadsheetOptions {
 
 export interface DataProvider {
   fetchData(startRow: number, endRow: number, startCol: number, endCol: number): Promise<any[][]>;
+  getColumns(): Promise<Column[]>;
   getTotalRows(): Promise<number>;
   getTotalColumns(): Promise<number>;
 }
@@ -103,4 +104,4 @@ export interface ScrollState {
   isFetching: boolean;
   lastFetchStart: number;
   lastFetchEnd: number;
-} 
+}

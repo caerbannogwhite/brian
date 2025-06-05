@@ -27,6 +27,7 @@ import {
 } from "../dafults";
 import { DEFAULT_MAX_HEIGHT } from "../dafults";
 import { Column, SpreadsheetOptions, DataProvider } from "./types";
+import { minMax } from "./utils/drawing";
 import { throttle } from "./utils/throttle";
 
 type RequiredSpreadsheetOptions = Omit<Required<SpreadsheetOptions>, "height" | "width"> & {
@@ -51,8 +52,10 @@ export class SpreadsheetVisualizer {
   private ctx: CanvasRenderingContext2D;
   private selectionCtx: CanvasRenderingContext2D;
   private hoverCtx: CanvasRenderingContext2D;
-  private columns: Column[];
   private dataProvider: DataProvider;
+  private columns: Column[];
+  private totalRows: number;
+  private totalColumns: number;
   private options: RequiredSpreadsheetOptions;
   private throttledMouseMove: (event: MouseEvent) => void;
 
@@ -75,7 +78,7 @@ export class SpreadsheetVisualizer {
   private visibleColumns = 0;
   private dataCache: Map<string, any[][]> = new Map();
 
-  constructor(canvas: HTMLCanvasElement, columns: Column[], dataProvider: DataProvider, options: Partial<SpreadsheetOptions> = {}) {
+  constructor(canvas: HTMLCanvasElement, dataProvider: DataProvider, options: Partial<SpreadsheetOptions> = {}) {
     this.canvas = canvas;
     this.ctx = canvas.getContext("2d")!;
 
@@ -98,8 +101,12 @@ export class SpreadsheetVisualizer {
     this.hoverCanvas.style.pointerEvents = "none"; // Allow mouse events to pass through to main canvas
     this.hoverCtx = this.hoverCanvas.getContext("2d", { alpha: true })!;
 
-    this.columns = columns;
+    // Initialize data provider
     this.dataProvider = dataProvider;
+
+    this.columns = [];
+    this.totalRows = 0;
+    this.totalColumns = 0;
 
     // Get container dimensions
     const container = canvas.parentElement;
@@ -154,10 +161,17 @@ export class SpreadsheetVisualizer {
 
     // Initialize throttled mouse move handler (16ms = ~60fps)
     this.throttledMouseMove = throttle(this.handleMouseMove.bind(this), 16);
+  }
+
+  public async initialize() {
+    this.columns = await this.dataProvider.getColumns();
+    this.totalRows = await this.dataProvider.getTotalRows();
+    this.totalColumns = await this.dataProvider.getTotalColumns();
 
     this.setupEventListeners();
     this.updateCanvasSize();
     this.calculateColumnWidths();
+    this.calculateRowHeight();
     this.draw();
   }
 
@@ -189,8 +203,8 @@ export class SpreadsheetVisualizer {
     let height = this.options.height ?? containerHeight;
 
     // Apply constraints
-    width = Math.min(Math.max(width, this.options.minWidth), this.options.maxWidth);
-    height = Math.min(Math.max(height, this.options.minHeight), this.options.maxHeight);
+    width = minMax(width, this.options.minWidth, this.options.maxWidth);
+    height = minMax(height, this.options.minHeight, this.options.maxHeight);
 
     // Update both canvases
     this.canvas.width = width;
@@ -233,6 +247,14 @@ export class SpreadsheetVisualizer {
 
     // Update visible columns
     this.visibleColumns = Math.ceil(availableWidth / (this.totalWidth / this.columns.length));
+  }
+
+  private calculateRowHeight() {
+    const availableHeight = this.canvas.height - this.options.scrollbarWidth;
+    const minTotalHeight = this.columns.length * this.options.cellHeight;
+    const hasScrollbar = minTotalHeight > availableHeight;
+
+    this.totalHeight = this.totalRows * this.options.cellHeight;
   }
 
   private async draw() {
@@ -386,20 +408,30 @@ export class SpreadsheetVisualizer {
 
   private async handleWheel(event: WheelEvent) {
     event.preventDefault();
+    let draw = false;
 
+    // Zoom
     if (event.ctrlKey) {
-      // Zoom
       const zoomFactor = event.deltaY > 0 ? 0.9 : 1.1;
       this.options.fontSize = Math.max(8, Math.min(24, this.options.fontSize * zoomFactor));
       this.options.headerFontSize = Math.max(8, Math.min(24, this.options.headerFontSize * zoomFactor));
       this.calculateColumnWidths();
-    } else {
-      // Scroll
-      this.scrollY = Math.max(0, this.scrollY + event.deltaY);
-      this.scrollX = Math.max(0, this.scrollX + event.deltaX);
+      draw = true;
     }
 
-    await this.draw();
+    // Scroll
+    else {
+      this.scrollY = minMax(this.scrollY + event.deltaY, 0, this.totalHeight);
+      this.scrollX = minMax(this.scrollX + event.deltaX, 0, this.totalWidth);
+
+      if ((this.scrollY > 0 && this.scrollY < this.totalHeight) || (this.scrollX > 0 && this.scrollX < this.totalWidth)) {
+        draw = true;
+      }
+    }
+
+    if (draw) {
+      await this.draw();
+    }
   }
 
   private async handleKeyDown(event: KeyboardEvent) {
@@ -409,6 +441,7 @@ export class SpreadsheetVisualizer {
     const row = event.shiftKey ? endRow : startRow;
     const col = event.shiftKey ? endCol : startCol;
 
+    let draw = false;
     switch (event.key) {
       case "ArrowUp":
         if (row > 0) {
@@ -419,6 +452,7 @@ export class SpreadsheetVisualizer {
             endCol: event.shiftKey ? endCol : col,
           };
           this.scrollY = Math.max(0, (row - 1) * this.options.cellHeight - this.canvas.height / 2);
+          draw = true;
         }
         break;
 
@@ -430,6 +464,7 @@ export class SpreadsheetVisualizer {
           endCol: event.shiftKey ? endCol : col,
         };
         this.scrollY = Math.max(0, (row + 1) * this.options.cellHeight - this.canvas.height / 2);
+        draw = true;
         break;
 
       case "ArrowLeft":
@@ -441,6 +476,7 @@ export class SpreadsheetVisualizer {
             endCol: event.shiftKey ? col - 1 : col - 1,
           };
           this.scrollX = Math.max(0, this.getColumnOffset(col - 1) - this.canvas.width / 2);
+          draw = true;
         }
         break;
 
@@ -453,6 +489,7 @@ export class SpreadsheetVisualizer {
             endCol: event.shiftKey ? col + 1 : col + 1,
           };
           this.scrollX = Math.max(0, this.getColumnOffset(col + 1) - this.canvas.width / 2);
+          draw = true;
         }
         break;
 
@@ -463,7 +500,9 @@ export class SpreadsheetVisualizer {
         break;
     }
 
-    await this.draw();
+    if (draw) {
+      await this.draw();
+    }
   }
 
   private async handleResize() {
