@@ -618,22 +618,28 @@ export class SpreadsheetVisualizer {
     ctx.font = `${this.options.headerFontSize}px ${this.options.fontFamily}`;
     ctx.fillStyle = this.options.headerTextColor;
     ctx.textBaseline = "middle";
+    ctx.textAlign = "left";
 
-    let x = this.options.rowHeaderWidth - this.scrollX;
+    let x = this.options.rowHeaderWidth;
     for (let col = startCol; col < endCol; col++) {
-      const textWidth = ctx.measureText(this.columns[col].header).width;
-      const textX = x + (this.columnWidths[col] - textWidth) / 2;
-      const textY = this.options.cellHeight / 2;
-
       if (x + this.columnWidths[col] > 0 && x < width) {
-        ctx.fillText(this.columns[col].header, textX, textY);
+        // Trim the text to the column width
+        const textWidth = ctx.measureText(this.columns[col].header).width;
+        const availableWidth = this.columnWidths[col] - this.options.cellPadding * 2;
+        const availableTextLength = Math.floor((availableWidth / textWidth) * this.columns[col].header.length);
+        const text = this.columns[col].header.slice(0, availableTextLength);
+
+        const textX = x + this.options.cellPadding;
+        const textY = this.options.cellHeight >> 1;
+
+        ctx.fillText(text, textX, textY, availableWidth);
       }
       x += this.columnWidths[col];
     }
 
-    // Draw row headers
+    // Draw row indices
     ctx.textAlign = "right";
-    let y = this.options.cellHeight - this.scrollY;
+    let y = this.options.cellHeight; // Keep the header at the top
     for (let row = startRow; row < endRow; row++) {
       if (y + this.options.cellHeight > 0 && y < height) {
         const text = (row + 1).toString();
@@ -650,9 +656,9 @@ export class SpreadsheetVisualizer {
     ctx.font = `${this.options.fontSize}px ${this.options.fontFamily}`;
     ctx.fillStyle = this.options.cellTextColor;
 
-    y = this.options.cellHeight - this.scrollY;
+    y = this.options.cellHeight; // Keep the header at the top
     for (let row = 0; row < data.length; row++) {
-      x = this.options.rowHeaderWidth - this.scrollX;
+      x = this.options.rowHeaderWidth; // Keep the row indices at the left
       for (let col = 0; col < data[row].length; col++) {
         const cellWidth = this.columnWidths[col + startCol];
         const column = this.columns[col + startCol];
