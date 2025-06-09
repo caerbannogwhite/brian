@@ -45,6 +45,15 @@ enum MouseState {
   DraggingHorizontalScrollbar,
 }
 
+enum ToDraw {
+  None = 0,
+  CellHover = 1,
+  RowHover = 2,
+  ColHover = 3,
+  Selection = 4,
+  Cells = 5,
+}
+
 export class SpreadsheetVisualizer {
   private canvas: HTMLCanvasElement;
   private selectionCanvas: HTMLCanvasElement;
@@ -55,7 +64,7 @@ export class SpreadsheetVisualizer {
   private dataProvider: DataProvider;
   private columns: Column[];
   private totalRows: number;
-  private totalColumns: number;
+  private totalCols: number;
   private options: RequiredSpreadsheetOptions;
   private throttledMouseMove: (event: MouseEvent) => void;
 
@@ -65,17 +74,20 @@ export class SpreadsheetVisualizer {
   private hoveredCell: { row: number; col: number } | null = null;
   private selectedCells: { startRow: number; endRow: number; startCol: number; endCol: number } | null = null;
   private mouseState = MouseState.Idle;
+  private toDraw = ToDraw.Cells;
   private dragStartX = 0;
   private dragStartY = 0;
   private lastScrollX = 0;
   private lastScrollY = 0;
+  private selectedRows: number[] = [];
+  private selectedCols: number[] = [];
 
   // Cache
   private columnWidths: number[] = [];
   private totalWidth = 0;
   private totalHeight = 0;
   private visibleRows = 0;
-  private visibleColumns = 0;
+  private visibleCols = 0;
   private dataCache: Map<string, any[][]> = new Map();
 
   constructor(canvas: HTMLCanvasElement, dataProvider: DataProvider, options: Partial<SpreadsheetOptions> = {}) {
@@ -84,29 +96,34 @@ export class SpreadsheetVisualizer {
 
     // Create and setup an overlay canvas for selection
     this.selectionCanvas = document.createElement("canvas");
+    this.selectionCanvas.id = "selection-canvas";
     this.selectionCanvas.style.position = "absolute";
-    this.selectionCanvas.style.top = "0";
-    this.selectionCanvas.style.left = "0";
+    this.selectionCanvas.style.top = `${this.canvas.offsetTop}px`;
+    this.selectionCanvas.style.left = `${this.canvas.offsetLeft}px`;
     this.selectionCanvas.style.pointerEvents = "none"; // Allow mouse events to pass through to main canvas
     this.selectionCtx = this.selectionCanvas.getContext("2d", { alpha: true })!;
 
-    // Insert overlay canvas after the main canvas
+    // Insert selection canvas after the main canvas
     canvas.parentElement?.insertBefore(this.selectionCanvas, canvas.nextSibling);
 
     // Create and setup an overlay canvas for hover
     this.hoverCanvas = document.createElement("canvas");
+    this.hoverCanvas.id = "hover-canvas";
     this.hoverCanvas.style.position = "absolute";
-    this.hoverCanvas.style.top = "0";
-    this.hoverCanvas.style.left = "0";
+    this.hoverCanvas.style.top = `${this.canvas.offsetTop}px`;
+    this.hoverCanvas.style.left = `${this.canvas.offsetLeft}px`;
     this.hoverCanvas.style.pointerEvents = "none"; // Allow mouse events to pass through to main canvas
     this.hoverCtx = this.hoverCanvas.getContext("2d", { alpha: true })!;
+
+    // Insert hover canvas after the main canvas
+    canvas.parentElement?.insertBefore(this.hoverCanvas, canvas.nextSibling);
 
     // Initialize data provider
     this.dataProvider = dataProvider;
 
     this.columns = [];
     this.totalRows = 0;
-    this.totalColumns = 0;
+    this.totalCols = 0;
 
     // Get container dimensions
     const container = canvas.parentElement;
@@ -166,7 +183,7 @@ export class SpreadsheetVisualizer {
   public async initialize() {
     this.columns = await this.dataProvider.getColumns();
     this.totalRows = await this.dataProvider.getTotalRows();
-    this.totalColumns = await this.dataProvider.getTotalColumns();
+    this.totalCols = await this.dataProvider.getTotalColumns();
 
     this.setupEventListeners();
     this.updateCanvasSize();
@@ -246,7 +263,7 @@ export class SpreadsheetVisualizer {
     }
 
     // Update visible columns
-    this.visibleColumns = Math.ceil(availableWidth / (this.totalWidth / this.columns.length));
+    this.visibleCols = Math.ceil(availableWidth / (this.totalWidth / this.columns.length));
   }
 
   private calculateRowHeight() {
@@ -257,26 +274,47 @@ export class SpreadsheetVisualizer {
     this.totalHeight = this.totalRows * this.options.cellHeight;
   }
 
-  private async draw() {
-    const { ctx, canvas } = this;
-    const { width, height } = canvas;
+  private updateToDraw(newToDraw: ToDraw) {
+    this.toDraw = Math.max(this.toDraw, newToDraw);
+  }
 
-    // Clear both canvases
-    ctx.clearRect(0, 0, width, height);
-    this.selectionCtx.clearRect(0, 0, width, height);
-    this.hoverCtx.clearRect(0, 0, width, height);
+  private async draw() {
+    const { canvas } = this;
+    const { height } = canvas;
 
     // Calculate visible area
     const visibleStartRow = Math.floor(this.scrollY / this.options.cellHeight);
-    const visibleEndRow = Math.min(visibleStartRow + Math.ceil(height / this.options.cellHeight), await this.dataProvider.getTotalRows());
+    const visibleEndRow = Math.min(visibleStartRow + Math.ceil(height / this.options.cellHeight), this.totalRows);
     const visibleStartCol = Math.floor(this.scrollX / (this.totalWidth / this.columns.length));
-    const visibleEndCol = Math.min(visibleStartCol + this.visibleColumns, await this.dataProvider.getTotalColumns());
+    const visibleEndCol = Math.min(visibleStartCol + this.visibleCols, this.totalCols);
 
-    // Draw cells
-    await this.drawCells(visibleStartRow, visibleEndRow, visibleStartCol, visibleEndCol);
+    switch (this.toDraw) {
+      //@ts-ignore: if cells is selected, fall through to selection
+      case ToDraw.Cells:
+        await this.drawCells(visibleStartRow, visibleEndRow, visibleStartCol, visibleEndCol);
+        this.drawScrollbars();
 
-    // Draw scrollbars
-    this.drawScrollbars();
+      //@ts-ignore: if cells is selected, fall through to hover
+      case ToDraw.Selection:
+        this.drawSelection(visibleStartRow, visibleEndRow, visibleStartCol, visibleEndCol);
+
+      case ToDraw.CellHover:
+        this.drawCellHover(visibleStartCol, visibleEndCol, visibleStartRow, visibleEndRow);
+        break;
+
+      case ToDraw.RowHover:
+        this.drawRowHover(visibleStartRow, visibleEndRow);
+        break;
+
+      case ToDraw.ColHover:
+        this.drawColHover(visibleStartCol, visibleEndCol);
+        break;
+
+      default:
+        break;
+    }
+
+    this.toDraw = ToDraw.None;
   }
 
   private async handleMouseDown(event: MouseEvent) {
@@ -284,33 +322,73 @@ export class SpreadsheetVisualizer {
     const x = event.clientX - rect.left;
     const y = event.clientY - rect.top;
 
-    // Check if clicking on scrollbars
-    if (this.isOverVerticalScrollbar(x, y)) {
+    // Vertical Scrolling
+    if (this.isMouseOverVerticalScrollbar(x, y)) {
       this.mouseState = MouseState.DraggingVerticalScrollbar;
       this.dragStartY = y;
       this.lastScrollY = this.scrollY;
-      return;
+
+      // This is handled in the mouse move event
+      // this.updateToDraw(ToDraw.Cells);
     }
 
-    if (this.isOverHorizontalScrollbar(x, y)) {
+    // Horizontal Scrolling
+    else if (this.isMouseOverHorizontalScrollbar(x, y)) {
       this.mouseState = MouseState.DraggingHorizontalScrollbar;
       this.dragStartX = x;
       this.lastScrollX = this.scrollX;
-      return;
+
+      // This is handled in the mouse move event
+      // this.updateToDraw(ToDraw.Cells);
+    }
+
+    // Column Header
+    else if (this.isMouseOverColumnHeader(x, y)) {
+      const cell = this.getCellAtPosition(x, y);
+      if (!cell) return;
+      const { col } = cell;
+
+      if (this.selectedCols.includes(col)) {
+        this.selectedCols = this.selectedCols.filter((i) => i !== col);
+      } else {
+        this.selectedCols.push(col);
+      }
+
+      this.updateToDraw(ToDraw.Selection);
+    }
+
+    // Row Index
+    else if (this.isMouseOverRowIndex(x, y)) {
+      const cell = this.getCellAtPosition(x, y);
+      if (!cell) return;
+      const { row } = cell;
+
+      if (this.selectedRows.includes(row)) {
+        this.selectedRows = this.selectedRows.filter((i) => i !== row);
+      } else {
+        this.selectedRows.push(row);
+      }
+
+      this.updateToDraw(ToDraw.Selection);
     }
 
     // Handle cell selection
-    const cell = await this.getCellAtPosition(x, y);
-    if (cell) {
-      this.mouseState = MouseState.Dragging;
-      this.selectedCells = {
-        startRow: cell.row,
-        endRow: cell.row,
-        startCol: cell.col,
-        endCol: cell.col,
-      };
-      // this.draw();
+    else {
+      const cell = this.getCellAtPosition(x, y);
+      if (cell) {
+        this.mouseState = MouseState.Dragging;
+        this.selectedCells = {
+          startRow: cell.row,
+          endRow: cell.row,
+          startCol: cell.col,
+          endCol: cell.col,
+        };
+
+        this.updateToDraw(ToDraw.Selection);
+      }
     }
+
+    await this.draw();
   }
 
   private async handleMouseMove(event: MouseEvent) {
@@ -318,28 +396,25 @@ export class SpreadsheetVisualizer {
     const x = event.clientX - rect.left;
     const y = event.clientY - rect.top;
 
-    let needsRedraw = false;
     let newHoverCell: { row: number; col: number } | null = null;
 
-    // Handle scrollbar dragging
     switch (this.mouseState) {
       case MouseState.DraggingVerticalScrollbar:
         const deltaY = y - this.dragStartY;
         const scrollRatioY = deltaY / (this.canvas.height - this.options.scrollbarWidth);
         this.scrollY = Math.max(0, this.lastScrollY + scrollRatioY * this.totalHeight);
-        needsRedraw = true;
+        this.updateToDraw(ToDraw.Cells);
         break;
 
       case MouseState.DraggingHorizontalScrollbar:
         const deltaX = x - this.dragStartX;
         const scrollRatioX = deltaX / (this.canvas.width - this.options.scrollbarWidth);
         this.scrollX = Math.max(0, this.lastScrollX + scrollRatioX * this.totalWidth);
-        needsRedraw = true;
+        this.updateToDraw(ToDraw.Cells);
         break;
 
       case MouseState.Dragging:
-        // Update hover state
-        newHoverCell = await this.getCellAtPosition(x, y);
+        newHoverCell = this.getCellAtPosition(x, y);
 
         // Update selection if dragging
         if (newHoverCell && this.selectedCells) {
@@ -348,67 +423,46 @@ export class SpreadsheetVisualizer {
           if (selectionChanged) {
             this.selectedCells.endRow = newHoverCell.row;
             this.selectedCells.endCol = newHoverCell.col;
-            // needsRedraw = true;
-            this.drawSelection();
+
+            this.updateToDraw(ToDraw.Selection);
           }
         }
         break;
 
-      case MouseState.Hovering:
-        newHoverCell = await this.getCellAtPosition(x, y);
+      // Hovering
+      default:
+        newHoverCell = this.getCellAtPosition(x, y);
         const hoverChanged = newHoverCell?.row !== this.hoveredCell?.row || newHoverCell?.col !== this.hoveredCell?.col;
         if (hoverChanged) {
           this.hoveredCell = newHoverCell;
-          // needsRedraw = true;
+          if (this.isMouseOverColumnHeader(x, y)) {
+            this.updateToDraw(ToDraw.ColHover);
+          } else if (this.isMouseOverRowIndex(x, y)) {
+            this.updateToDraw(ToDraw.RowHover);
+          } else {
+            this.updateToDraw(ToDraw.CellHover);
+          }
         }
         break;
-
-      // case MouseState.HoveringVerticalScrollbar:
-      //   newHoverCell = await this.getCellAtPosition(x, y);
-      //   const hoverChanged = newHoverCell?.row !== this.hoveredCell?.row || newHoverCell?.col !== this.hoveredCell?.col;
-      //   if (hoverChanged) {
-      //     this.hoveredCell = newHoverCell;
-      //     needsRedraw = true;
-      //   }
-
-      //   if (hoverChanged) {
-      //     this.hoveredCell = newHoverCell;
-      //     this.isHoveringVerticalScrollbar = this.isOverVerticalScrollbar(x, y);
-      //     this.isHoveringHorizontalScrollbar = this.isOverHorizontalScrollbar(x, y);
-      //     // needsRedraw = true;
-      //     this.drawOverlay();
-      //   }
-
-      default:
-        break;
     }
 
-    if (needsRedraw) {
-      await this.draw();
-    }
+    await this.draw();
   }
 
   private handleMouseUp() {
-    // this.isDragging = false;
-    // this.isDraggingVerticalScrollbar = false;
-    // this.isDraggingHorizontalScrollbar = false;
     this.mouseState = MouseState.Idle;
   }
 
-  private handleMouseLeave() {
+  private async handleMouseLeave() {
     this.hoveredCell = null;
-    // this.isHoveringVerticalScrollbar = false;
-    // this.isHoveringHorizontalScrollbar = false;
-    // this.isDragging = false;
-    // this.isDraggingVerticalScrollbar = false;
-    // this.isDraggingHorizontalScrollbar = false;
     this.mouseState = MouseState.Idle;
-    this.draw();
+    this.updateToDraw(ToDraw.CellHover);
+
+    await this.draw();
   }
 
   private async handleWheel(event: WheelEvent) {
     event.preventDefault();
-    let draw = false;
 
     // Zoom
     if (event.ctrlKey) {
@@ -416,7 +470,8 @@ export class SpreadsheetVisualizer {
       this.options.fontSize = Math.max(8, Math.min(24, this.options.fontSize * zoomFactor));
       this.options.headerFontSize = Math.max(8, Math.min(24, this.options.headerFontSize * zoomFactor));
       this.calculateColumnWidths();
-      draw = true;
+
+      this.updateToDraw(ToDraw.Cells);
     }
 
     // Scroll
@@ -425,13 +480,11 @@ export class SpreadsheetVisualizer {
       this.scrollX = minMax(this.scrollX + event.deltaX, 0, this.totalWidth);
 
       if ((this.scrollY > 0 && this.scrollY < this.totalHeight) || (this.scrollX > 0 && this.scrollX < this.totalWidth)) {
-        draw = true;
+        this.updateToDraw(ToDraw.Cells);
       }
     }
 
-    if (draw) {
-      await this.draw();
-    }
+    await this.draw();
   }
 
   private async handleKeyDown(event: KeyboardEvent) {
@@ -441,7 +494,6 @@ export class SpreadsheetVisualizer {
     const row = event.shiftKey ? endRow : startRow;
     const col = event.shiftKey ? endCol : startCol;
 
-    let draw = false;
     switch (event.key) {
       case "ArrowUp":
         if (row > 0) {
@@ -452,7 +504,8 @@ export class SpreadsheetVisualizer {
             endCol: event.shiftKey ? endCol : col,
           };
           this.scrollY = Math.max(0, (row - 1) * this.options.cellHeight - this.canvas.height / 2);
-          draw = true;
+
+          this.updateToDraw(ToDraw.Cells);
         }
         break;
 
@@ -464,7 +517,8 @@ export class SpreadsheetVisualizer {
           endCol: event.shiftKey ? endCol : col,
         };
         this.scrollY = Math.max(0, (row + 1) * this.options.cellHeight - this.canvas.height / 2);
-        draw = true;
+
+        this.updateToDraw(ToDraw.Cells);
         break;
 
       case "ArrowLeft":
@@ -476,7 +530,8 @@ export class SpreadsheetVisualizer {
             endCol: event.shiftKey ? col - 1 : col - 1,
           };
           this.scrollX = Math.max(0, this.getColumnOffset(col - 1) - this.canvas.width / 2);
-          draw = true;
+
+          this.updateToDraw(ToDraw.Cells);
         }
         break;
 
@@ -489,7 +544,8 @@ export class SpreadsheetVisualizer {
             endCol: event.shiftKey ? col + 1 : col + 1,
           };
           this.scrollX = Math.max(0, this.getColumnOffset(col + 1) - this.canvas.width / 2);
-          draw = true;
+
+          this.updateToDraw(ToDraw.Cells);
         }
         break;
 
@@ -500,22 +556,30 @@ export class SpreadsheetVisualizer {
         break;
     }
 
-    if (draw) {
-      await this.draw();
-    }
+    await this.draw();
   }
 
   private async handleResize() {
     this.updateCanvasSize();
+    this.updateToDraw(ToDraw.Cells);
+
     await this.draw();
   }
 
-  private isOverVerticalScrollbar(x: number, y: number): boolean {
+  private isMouseOverVerticalScrollbar(x: number, _: number): boolean {
     return x >= this.canvas.width - this.options.scrollbarWidth;
   }
 
-  private isOverHorizontalScrollbar(x: number, y: number): boolean {
+  private isMouseOverHorizontalScrollbar(_: number, y: number): boolean {
     return y >= this.canvas.height - this.options.scrollbarWidth;
+  }
+
+  private isMouseOverColumnHeader(x: number, y: number): boolean {
+    return x >= this.options.rowHeaderWidth && y < this.options.cellHeight;
+  }
+
+  private isMouseOverRowIndex(x: number, y: number): boolean {
+    return x <= this.options.rowHeaderWidth;
   }
 
   private getColumnOffset(col: number): number {
@@ -570,15 +634,14 @@ export class SpreadsheetVisualizer {
     return String(value);
   }
 
-  private async getCellAtPosition(x: number, y: number): Promise<{ row: number; col: number } | null> {
+  private getCellAtPosition(x: number, y: number): { row: number; col: number } | null {
     const adjustedX = x + this.scrollX;
     const adjustedY = y + this.scrollY;
 
     // Check if we're in the row header area
     if (adjustedX < this.options.rowHeaderWidth) {
       const row = Math.floor(adjustedY / this.options.cellHeight);
-      const totalRows = await this.dataProvider.getTotalRows();
-      if (row >= 0 && row < totalRows) {
+      if (row >= 0 && row < this.totalRows) {
         return { row, col: -1 };
       }
       return null;
@@ -594,11 +657,9 @@ export class SpreadsheetVisualizer {
 
     // Find the row
     const row = Math.floor(adjustedY / this.options.cellHeight);
-    const totalRows = await this.dataProvider.getTotalRows();
-    const totalColumns = await this.dataProvider.getTotalColumns();
 
     // Check bounds
-    if (row >= 0 && row < totalRows && col < totalColumns) {
+    if (row >= 0 && row < this.totalRows && col < this.totalCols) {
       return { row, col };
     }
 
@@ -608,6 +669,9 @@ export class SpreadsheetVisualizer {
   private async drawCells(startRow: number, endRow: number, startCol: number, endCol: number) {
     const { ctx, canvas } = this;
     const { width, height } = canvas;
+
+    // Clear the canvas
+    ctx.clearRect(0, 0, width, height);
 
     // Draw headers
     ctx.fillStyle = this.options.headerBackgroundColor;
@@ -630,7 +694,7 @@ export class SpreadsheetVisualizer {
         const text = this.columns[col].header.slice(0, availableTextLength);
 
         const textX = x + this.options.cellPadding;
-        const textY = this.options.cellHeight >> 1;
+        const textY = this.options.cellHeight >> 1; // Divide by 2 to center the text
 
         ctx.fillText(text, textX, textY, availableWidth);
       }
@@ -695,10 +759,80 @@ export class SpreadsheetVisualizer {
     }
   }
 
-  private drawSelection() {
-    // Clear only the overlay canvas
+  private drawCellHover(startCol: number, endCol: number, startRow: number, endRow: number) {
+    // Clear the hover canvas
+    this.hoverCtx.clearRect(0, 0, this.hoverCanvas.width, this.hoverCanvas.height);
+
+    this.hoverCtx.fillStyle = this.options.hoverColor;
+    this.hoverCtx.strokeStyle = this.options.borderColor;
+
+    if (this.hoveredCell) {
+      const { row, col } = this.hoveredCell;
+
+      const x = this.columnWidths.slice(startCol, col).reduce((sum, width) => sum + width, 0) + this.options.rowHeaderWidth;
+      const y = row * this.options.cellHeight - this.scrollY;
+      const width = this.columnWidths[col];
+      const height = this.options.cellHeight;
+
+      this.hoverCtx.fillRect(x, y, width, height);
+      this.hoverCtx.strokeRect(x, y, width, height);
+    }
+  }
+
+  private drawColHover(startCol: number, endCol: number) {
+    // Clear the hover canvas
+    this.hoverCtx.clearRect(0, 0, this.hoverCanvas.width, this.hoverCanvas.height);
+
+    this.hoverCtx.fillStyle = this.options.hoverColor;
+    this.hoverCtx.strokeStyle = this.options.borderColor;
+
+    if (this.hoveredCell) {
+      const { col } = this.hoveredCell;
+
+      if (col < startCol || col > endCol) return;
+
+      const x = this.columnWidths.slice(startCol, col).reduce((sum, width) => sum + width, 0) + this.options.rowHeaderWidth;
+      const y = 0;
+      const width = this.columnWidths[col];
+      const height = this.selectionCanvas.height - this.options.scrollbarWidth;
+
+      this.hoverCtx.fillRect(x, y, width, height);
+      this.hoverCtx.strokeRect(x, y, width, height);
+    }
+  }
+
+  private drawRowHover(startRow: number, endRow: number) {
+    // Clear the hover canvas
+    this.hoverCtx.clearRect(0, 0, this.hoverCanvas.width, this.hoverCanvas.height);
+
+    this.hoverCtx.fillStyle = this.options.hoverColor;
+    this.hoverCtx.strokeStyle = this.options.borderColor;
+
+    if (this.hoveredCell) {
+      const { row } = this.hoveredCell;
+
+      if (row < startRow || row > endRow) return;
+
+      const x = 0;
+      const y = (row - startRow) * this.options.cellHeight;
+      const width = this.selectionCanvas.width - this.options.scrollbarWidth;
+      const height = this.options.cellHeight;
+
+      this.hoverCtx.fillRect(x, y, width, height);
+      this.hoverCtx.strokeRect(x, y, width, height);
+    }
+  }
+
+  private drawSelection(startRow: number, endRow: number, startCol: number, endCol: number) {
+    // Clear the selection canvas
     this.selectionCtx.clearRect(0, 0, this.selectionCanvas.width, this.selectionCanvas.height);
 
+    // this.drawCellSelection();
+    this.drawColSelection(startCol, endCol);
+    this.drawRowSelection(startRow, endRow);
+  }
+
+  private drawCellSelection() {
     // Draw selection
     if (this.selectedCells) {
       const { startRow, endRow, startCol, endCol } = this.selectedCells;
@@ -723,20 +857,53 @@ export class SpreadsheetVisualizer {
       }
     }
 
-    // Draw hover
-    if (this.hoveredCell) {
-      const { row, col } = this.hoveredCell;
-      this.hoverCtx.fillStyle = this.options.hoverColor;
+    // // Draw hover
+    // if (this.hoveredCell) {
+    //   const { row, col } = this.hoveredCell;
+    //   this.hoverCtx.fillStyle = this.options.hoverColor;
 
-      const x = col === -1 ? 0 : this.getColumnOffset(col) - this.scrollX;
-      const y = row * this.options.cellHeight - this.scrollY;
-      const width = col === -1 ? this.options.rowHeaderWidth : this.columnWidths[col];
+    //   const x = col === -1 ? 0 : this.getColumnOffset(col) - this.scrollX;
+    //   const y = row * this.options.cellHeight - this.scrollY;
+    //   const width = col === -1 ? this.options.rowHeaderWidth : this.columnWidths[col];
+    //   const height = this.options.cellHeight;
+
+    //   if (x + width > 0 && x < this.canvas.width && y + height > 0 && y < this.canvas.height) {
+    //     this.selectionCtx.fillRect(x, y, width, height);
+    //   }
+    // }
+  }
+
+  private drawColSelection(startCol: number, endCol: number) {
+    this.selectionCtx.fillStyle = this.options.selectionColor;
+    this.selectionCtx.strokeStyle = this.options.borderColor;
+
+    this.selectedCols.forEach((col) => {
+      if (col < startCol || col > endCol) return;
+
+      const x = this.columnWidths.slice(startCol, col).reduce((sum, width) => sum + width, 0) + this.options.rowHeaderWidth;
+      const y = 0;
+      const width = this.columnWidths[col];
+      const height = this.selectionCanvas.height - this.options.scrollbarWidth;
+
+      this.selectionCtx.fillRect(x, y, width, height);
+      this.selectionCtx.strokeRect(x, y, width, height);
+    });
+  }
+
+  private drawRowSelection(startRow: number, endRow: number) {
+    this.selectionCtx.fillStyle = this.options.selectionColor;
+    this.selectionCtx.strokeStyle = this.options.borderColor;
+    this.selectedRows.forEach((row) => {
+      if (row < startRow || row > endRow) return;
+
+      const x = 0;
+      const y = (row - startRow) * this.options.cellHeight;
+      const width = this.selectionCanvas.width - this.options.scrollbarWidth;
       const height = this.options.cellHeight;
 
-      if (x + width > 0 && x < this.canvas.width && y + height > 0 && y < this.canvas.height) {
-        this.selectionCtx.fillRect(x, y, width, height);
-      }
-    }
+      this.selectionCtx.fillRect(x, y, width, height);
+      this.selectionCtx.strokeRect(x, y, width, height);
+    });
   }
 
   private drawScrollbars() {
