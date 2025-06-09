@@ -670,6 +670,9 @@ export class SpreadsheetVisualizer {
     const { ctx, canvas } = this;
     const { width, height } = canvas;
 
+    // Get the data before clearing the canvas
+    const data = await this.dataProvider.fetchData(startRow, endRow, startCol, endCol);
+
     // Clear the canvas
     ctx.clearRect(0, 0, width, height);
 
@@ -715,7 +718,6 @@ export class SpreadsheetVisualizer {
     }
 
     // Draw cells
-    const data = await this.dataProvider.fetchData(startRow, endRow, startCol, endCol);
     ctx.textAlign = "left";
     ctx.font = `${this.options.fontSize}px ${this.options.fontFamily}`;
     ctx.fillStyle = this.options.cellTextColor;
