@@ -10,7 +10,8 @@ export class CdiscDataProvider implements DataProvider {
 
   async fetchData(startRow: number, endRow: number, startCol: number, endCol: number): Promise<any[][]> {
     // Simulate network delay
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    const randomDelay = Math.random() * 10;
+    await new Promise((resolve) => setTimeout(resolve, 100 - randomDelay));
 
     return this.dataset.rows.slice(startRow, endRow).map((row: any[]) => row.slice(startCol, endCol + 1));
   }
