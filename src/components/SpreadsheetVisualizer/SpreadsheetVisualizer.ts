@@ -761,7 +761,7 @@ export class SpreadsheetVisualizer {
     }
   }
 
-  private drawCellHover(startCol: number, endCol: number, startRow: number, endRow: number) {
+  private drawCellHover(startCol: number, _: number, startRow: number, endRow: number) {
     // Clear the hover canvas
     this.hoverCtx.clearRect(0, 0, this.hoverCanvas.width, this.hoverCanvas.height);
 
@@ -772,7 +772,7 @@ export class SpreadsheetVisualizer {
       const { row, col } = this.hoveredCell;
 
       const x = this.columnWidths.slice(startCol, col).reduce((sum, width) => sum + width, 0) + this.options.rowHeaderWidth;
-      const y = row * this.options.cellHeight - this.scrollY;
+      const y = (row - startRow) * this.options.cellHeight;
       const width = this.columnWidths[col];
       const height = this.options.cellHeight;
 
@@ -831,10 +831,10 @@ export class SpreadsheetVisualizer {
 
     // this.drawCellSelection();
     this.drawColSelection(startCol, endCol);
-    this.drawRowSelection(startRow, endRow);
+    // this.drawRowSelection(startRow, endRow);
   }
 
-  private drawCellSelection() {
+  private drawCellSelection(visibleStartRow: number, visibleEndRow: number, visibleStartCol: number, visibleEndCol: number) {
     // Draw selection
     if (this.selectedCells) {
       const { startRow, endRow, startCol, endCol } = this.selectedCells;
@@ -892,21 +892,21 @@ export class SpreadsheetVisualizer {
     });
   }
 
-  private drawRowSelection(startRow: number, endRow: number) {
-    this.selectionCtx.fillStyle = this.options.selectionColor;
-    this.selectionCtx.strokeStyle = this.options.borderColor;
-    this.selectedRows.forEach((row) => {
-      if (row < startRow || row > endRow) return;
+  // private drawRowSelection(startRow: number, endRow: number) {
+  //   this.selectionCtx.fillStyle = this.options.selectionColor;
+  //   this.selectionCtx.strokeStyle = this.options.borderColor;
+  //   this.selectedRows.forEach((row) => {
+  //     if (row < startRow || row > endRow) return;
 
-      const x = 0;
-      const y = (row - startRow) * this.options.cellHeight;
-      const width = this.selectionCanvas.width - this.options.scrollbarWidth;
-      const height = this.options.cellHeight;
+  //     const x = 0;
+  //     const y = (row - startRow) * this.options.cellHeight;
+  //     const width = this.selectionCanvas.width - this.options.scrollbarWidth;
+  //     const height = this.options.cellHeight;
 
-      this.selectionCtx.fillRect(x, y, width, height);
-      this.selectionCtx.strokeRect(x, y, width, height);
-    });
-  }
+  //     this.selectionCtx.fillRect(x, y, width, height);
+  //     this.selectionCtx.strokeRect(x, y, width, height);
+  //   });
+  // }
 
   private drawScrollbars() {
     const { ctx, canvas } = this;
