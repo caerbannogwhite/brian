@@ -46,7 +46,7 @@ export class ColumnStatsVisualizer {
 
     if (columnIndex === -1) return;
 
-    const data = await this.dataProvider.fetchData(0, totalRows, columnIndex, columnIndex + 1);
+    const data = await this.dataProvider.fetchData(0, totalRows, columnIndex, columnIndex);
     const values = data.flat();
 
     this.stats = {
@@ -175,13 +175,20 @@ export class ColumnStatsVisualizer {
         gap: 0.5rem;
       }
       .histogram-label {
-        min-width: 100px;
+        width: 120px;
         font-size: 0.8rem;
         color: #666;
         text-align: right;
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
+        padding-right: 0.5rem;
+        cursor: pointer;
+        transition: color 0.2s ease;
+      }
+      .histogram-label:hover {
+        color: #2196f3;
+        font-weight: 500;
       }
       .histogram-bar {
         flex: 1;
@@ -198,7 +205,7 @@ export class ColumnStatsVisualizer {
         transition: width 0.3s ease-out;
       }
       .histogram-count {
-        min-width: 60px;
+        min-width: 80px;
         font-size: 0.8rem;
         color: #666;
         font-family: 'SF Mono', 'Consolas', monospace;
@@ -232,19 +239,8 @@ export class ColumnStatsVisualizer {
           <div class="stat-value">${this.stats.min.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
         </div>
         <div class="stat-item">
-          <div class="stat-label">Max</div>
-          <div class="stat-value">${this.stats.max!.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-        </div>
-        <div class="stat-item">
           <div class="stat-label">Mean</div>
           <div class="stat-value">${this.stats.mean!.toLocaleString(undefined, {
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2,
-          })}</div>
-        </div>
-        <div class="stat-item">
-          <div class="stat-label">Median</div>
-          <div class="stat-value">${this.stats.median!.toLocaleString(undefined, {
             minimumFractionDigits: 2,
             maximumFractionDigits: 2,
           })}</div>
@@ -255,6 +251,17 @@ export class ColumnStatsVisualizer {
             minimumFractionDigits: 2,
             maximumFractionDigits: 2,
           })}</div>
+        </div>
+        <div class="stat-item">
+        <div class="stat-label">Median</div>
+          <div class="stat-value">${this.stats.median!.toLocaleString(undefined, {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+          })}</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-label">Max</div>
+          <div class="stat-value">${this.stats.max!.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
         </div>
       `);
     }
@@ -272,6 +279,7 @@ export class ColumnStatsVisualizer {
         .slice(0, 10);
 
       const maxCount = Math.max(...sortedCounts.map(([_, count]) => count));
+      const totalValidValues = this.stats.totalCount - this.stats.nullCount;
 
       return `
         <div class="histogram-container">
@@ -279,15 +287,19 @@ export class ColumnStatsVisualizer {
           <div class="histogram">
             ${sortedCounts
               .map(
-                ([value, count]) => `
-              <div class="histogram-bar-container">
-                <div class="histogram-label" title="${value}">${value}</div>
-                <div class="histogram-bar">
-                  <div class="histogram-bar-fill" style="width: ${(count / maxCount) * 100}%"></div>
+                ([value, count]) => {
+                  const percentage = ((count / totalValidValues) * 100).toFixed(1);
+                  const displayValue = value.length > 15 ? value.substring(0, 15) + "..." : value;
+                  return `
+                <div class="histogram-bar-container">
+                  <div class="histogram-label" title="${value}">${displayValue}</div>
+                  <div class="histogram-bar">
+                    <div class="histogram-bar-fill" style="width: ${(count / maxCount) * 100}%"></div>
+                  </div>
+                  <div class="histogram-count">${count.toLocaleString()} (${percentage}%)</div>
                 </div>
-                <div class="histogram-count">${count.toLocaleString()}</div>
-              </div>
-            `
+              `;
+                }
               )
               .join("")}
           </div>
