@@ -1,4 +1,4 @@
-import { DEFAULT_BORDER_COLOR, DEFAULT_BORDER_WIDTH } from "@/components/dafults";
+import { DEFAULT_BORDER_COLOR, DEFAULT_BORDER_WIDTH } from "@/components/SpreadsheetVisualizer/defaults";
 import { Column, CellStyle, CellPosition, SpreadsheetOptions } from "../types";
 import { formatCellValue } from "./cellFormatting";
 
