@@ -24,11 +24,12 @@ import {
   DEFAULT_DATETIME_FORMAT,
   DEFAULT_NUMBER_FORMAT,
   DEFAULT_BORDER_WIDTH,
-} from "../dafults";
-import { DEFAULT_MAX_HEIGHT } from "../dafults";
+} from "./defaults";
+import { DEFAULT_MAX_HEIGHT } from "./defaults";
 import { Column, SpreadsheetOptions, DataProvider } from "./types";
 import { minMax } from "./utils/drawing";
 import { throttle } from "./utils/throttle";
+import { ColumnStatsVisualizer } from "../ColumnStatsVisualizer/ColumnStatsVisualizer";
 
 type RequiredSpreadsheetOptions = Omit<Required<SpreadsheetOptions>, "height" | "width"> & {
   height: number;
@@ -79,6 +80,7 @@ export class SpreadsheetVisualizer {
   private dragStartY = 0;
   private lastScrollX = 0;
   private lastScrollY = 0;
+  private singleColSelectionMode: boolean = true;
   private selectedRows: number[] = [];
   private selectedCols: number[] = [];
 
@@ -89,6 +91,10 @@ export class SpreadsheetVisualizer {
   private visibleRows = 0;
   private visibleCols = 0;
   private dataCache: Map<string, any[][]> = new Map();
+
+  private statsVisualizer: ColumnStatsVisualizer | null = null;
+  private statsPanelWidth = 300; // Width of the stats panel
+  private hasStatsPanel = false;
 
   constructor(canvas: HTMLCanvasElement, dataProvider: DataProvider, options: Partial<SpreadsheetOptions> = {}) {
     this.canvas = canvas;
@@ -178,6 +184,41 @@ export class SpreadsheetVisualizer {
 
     // Initialize throttled mouse move handler (16ms = ~60fps)
     this.throttledMouseMove = throttle(this.handleMouseMove.bind(this), 16);
+
+    // Create stats container
+    const statsContainer = document.createElement("div");
+    statsContainer.id = "column-stats-container";
+    statsContainer.style.position = "absolute";
+    statsContainer.style.top = "0";
+    statsContainer.style.right = "0";
+    statsContainer.style.width = `${this.statsPanelWidth}px`;
+    statsContainer.style.height = "100%";
+    statsContainer.style.backgroundColor = "white";
+    statsContainer.style.boxShadow = "-2px 0 4px rgba(0,0,0,0.1)";
+    statsContainer.style.transition = "transform 0.2s ease-in-out";
+    statsContainer.style.transform = "translateX(100%)";
+    statsContainer.style.zIndex = "1000";
+    canvas.parentElement?.appendChild(statsContainer);
+
+    // Add styles to handle the container layout
+    const style = document.createElement("style");
+    style.textContent = `
+      #spreadsheet-container {
+        position: relative;
+        display: flex;
+        width: 100%;
+        height: 100%;
+      }
+      #spreadsheet-container canvas {
+        transition: width 0.2s ease-in-out;
+      }
+      #column-stats-container {
+        flex-shrink: 0;
+      }
+    `;
+    canvas.parentElement?.appendChild(style);
+
+    this.statsVisualizer = new ColumnStatsVisualizer(statsContainer, dataProvider);
   }
 
   public async initialize() {
@@ -186,10 +227,8 @@ export class SpreadsheetVisualizer {
     this.totalCols = await this.dataProvider.getTotalColumns();
 
     this.setupEventListeners();
-    this.updateCanvasSize();
-    this.calculateColumnWidths();
-    this.calculateRowHeight();
-    this.draw();
+    await this.updateLayout();
+    await this.draw();
   }
 
   private setupEventListeners() {
@@ -207,36 +246,63 @@ export class SpreadsheetVisualizer {
     window.addEventListener("resize", () => this.handleResize().catch(console.error));
   }
 
-  private async updateCanvasSize() {
-    const container = this.canvas.parentElement;
-    if (!container) return;
+  private async updateLayout() {
+    if (!this.canvas.parentElement) return;
 
-    const containerRect = container.getBoundingClientRect();
-    const containerWidth = containerRect.width;
-    const containerHeight = containerRect.height;
+    const container = this.canvas.parentElement;
+    const containerWidth = Math.floor(container.clientWidth);
+    const containerHeight = Math.floor(container.clientHeight);
 
     // Calculate canvas dimensions based on options and container size
     let width = this.options.width ?? containerWidth;
     let height = this.options.height ?? containerHeight;
 
     // Apply constraints
-    width = minMax(width, this.options.minWidth, this.options.maxWidth);
-    height = minMax(height, this.options.minHeight, this.options.maxHeight);
+    width = Math.floor(minMax(width, this.options.minWidth, this.options.maxWidth));
+    height = Math.floor(minMax(height, this.options.minHeight, this.options.maxHeight));
 
-    // Update both canvases
+    if (this.hasStatsPanel) {
+      // Adjust canvas width to make room for stats panel
+      width = Math.floor(Math.max(width - this.statsPanelWidth, this.options.minWidth));
+
+      // Show stats panel
+      const statsContainer = document.getElementById("column-stats-container");
+      if (statsContainer) {
+        statsContainer.style.transform = "translateX(0)";
+      }
+    } else {
+      // Hide stats panel
+      const statsContainer = document.getElementById("column-stats-container");
+      if (statsContainer) {
+        statsContainer.style.transform = "translateX(100%)";
+      }
+    }
+
     this.canvas.width = width;
     this.canvas.height = height;
+    this.canvas.style.width = `${width}px`;
+    this.canvas.style.height = `${height}px`;
+
     this.selectionCanvas.width = width;
     this.selectionCanvas.height = height;
     this.selectionCanvas.style.width = `${width}px`;
     this.selectionCanvas.style.height = `${height}px`;
+    this.selectionCanvas.style.top = `${this.canvas.offsetTop}px`;
+    this.selectionCanvas.style.left = `${this.canvas.offsetLeft}px`;
+
     this.hoverCanvas.width = width;
     this.hoverCanvas.height = height;
     this.hoverCanvas.style.width = `${width}px`;
     this.hoverCanvas.style.height = `${height}px`;
+    this.hoverCanvas.style.top = `${this.canvas.offsetTop}px`;
+    this.hoverCanvas.style.left = `${this.canvas.offsetLeft}px`;
 
     // Recalculate column widths and redraw
     this.calculateColumnWidths();
+    this.calculateRowHeight();
+
+    this.updateToDraw(ToDraw.Cells);
+
     await this.draw();
   }
 
@@ -302,9 +368,9 @@ export class SpreadsheetVisualizer {
         this.drawCellHover(visibleStartCol, visibleEndCol, visibleStartRow, visibleEndRow);
         break;
 
-      case ToDraw.RowHover:
-        this.drawRowHover(visibleStartRow, visibleEndRow);
-        break;
+      // case ToDraw.RowHover:
+      //   this.drawRowHover(visibleStartRow, visibleEndRow);
+      //   break;
 
       case ToDraw.ColHover:
         this.drawColHover(visibleStartCol, visibleEndCol);
@@ -343,18 +409,30 @@ export class SpreadsheetVisualizer {
     }
 
     // Column Header
-    else if (this.isMouseOverColumnHeader(x, y)) {
+    if (this.isMouseOverColumnHeader(x, y)) {
       const cell = this.getCellAtPosition(x, y);
       if (!cell) return;
       const { col } = cell;
 
       if (this.selectedCols.includes(col)) {
         this.selectedCols = this.selectedCols.filter((i) => i !== col);
+        this.statsVisualizer?.hide();
+        this.hasStatsPanel = false;
       } else {
-        this.selectedCols.push(col);
+        if (this.singleColSelectionMode) {
+          this.selectedCols = [col]; // Only allow one column selection at a time
+        } else {
+          this.selectedCols.push(col);
+        }
+
+        if (this.statsVisualizer) {
+          await this.statsVisualizer.showStats(this.columns[col]);
+          this.hasStatsPanel = true;
+        }
       }
 
       this.updateToDraw(ToDraw.Selection);
+      this.updateLayout();
     }
 
     // Row Index
@@ -560,7 +638,7 @@ export class SpreadsheetVisualizer {
   }
 
   private async handleResize() {
-    this.updateCanvasSize();
+    this.updateLayout();
     this.updateToDraw(ToDraw.Cells);
 
     await this.draw();
@@ -803,27 +881,28 @@ export class SpreadsheetVisualizer {
     }
   }
 
-  private drawRowHover(startRow: number, endRow: number) {
-    // Clear the hover canvas
-    this.hoverCtx.clearRect(0, 0, this.hoverCanvas.width, this.hoverCanvas.height);
+  // TODO: Keep or remove?
+  // private drawRowHover(startRow: number, endRow: number) {
+  //   // Clear the hover canvas
+  //   this.hoverCtx.clearRect(0, 0, this.hoverCanvas.width, this.hoverCanvas.height);
 
-    this.hoverCtx.fillStyle = this.options.hoverColor;
-    this.hoverCtx.strokeStyle = this.options.borderColor;
+  //   this.hoverCtx.fillStyle = this.options.hoverColor;
+  //   this.hoverCtx.strokeStyle = this.options.borderColor;
 
-    if (this.hoveredCell) {
-      const { row } = this.hoveredCell;
+  //   if (this.hoveredCell) {
+  //     const { row } = this.hoveredCell;
 
-      if (row < startRow || row > endRow) return;
+  //     if (row < startRow || row > endRow) return;
 
-      const x = 0;
-      const y = (row - startRow) * this.options.cellHeight;
-      const width = this.selectionCanvas.width - this.options.scrollbarWidth;
-      const height = this.options.cellHeight;
+  //     const x = 0;
+  //     const y = (row - startRow) * this.options.cellHeight;
+  //     const width = this.selectionCanvas.width - this.options.scrollbarWidth;
+  //     const height = this.options.cellHeight;
 
-      this.hoverCtx.fillRect(x, y, width, height);
-      this.hoverCtx.strokeRect(x, y, width, height);
-    }
-  }
+  //     this.hoverCtx.fillRect(x, y, width, height);
+  //     this.hoverCtx.strokeRect(x, y, width, height);
+  //   }
+  // }
 
   private drawSelection(startRow: number, endRow: number, startCol: number, endCol: number) {
     // Clear the selection canvas
@@ -892,6 +971,7 @@ export class SpreadsheetVisualizer {
     });
   }
 
+  // TODO: Keep or remove?
   // private drawRowSelection(startRow: number, endRow: number) {
   //   this.selectionCtx.fillStyle = this.options.selectionColor;
   //   this.selectionCtx.strokeStyle = this.options.borderColor;
