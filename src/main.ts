@@ -8,15 +8,15 @@ async function initSpreadsheet() {
   const container = document.getElementById("spreadsheet-container");
   if (!container) return;
 
-  const canvas = document.createElement("canvas");
-  container.appendChild(canvas);
+  container.style.width = "100%";
+  container.style.height = `${window.innerHeight - 50}px`;
+  container.style.border = "1px solid #e0e0e0";
+  container.style.borderRadius = "4px";
+  container.style.overflow = "hidden";
 
   const dataProvider = new CdiscDataProvider(datasetDm as CdiscDataset);
 
-  const spreadsheetVisualizer = new SpreadsheetVisualizer(canvas, dataProvider, {
-    // Viewport options
-    maxHeight: 800,
-    maxWidth: 1200,
+  const spreadsheetVisualizer = new SpreadsheetVisualizer(container, dataProvider, {
     minHeight: 400,
     minWidth: 600,
 
