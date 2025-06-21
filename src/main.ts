@@ -1,7 +1,7 @@
 import { datasetDm } from "./data";
 import { SpreadsheetVisualizer } from "./components/SpreadsheetVisualizer";
 import { CdiscDataProvider } from "./data/providers/CdiscDataProvider";
-import { getColumns, type CdiscDataset } from "./data/types";
+import { type CdiscDataset } from "./data/types";
 
 // Initialize the spreadsheet
 async function initSpreadsheet() {
