@@ -56,6 +56,7 @@ enum ToDraw {
 }
 
 export class SpreadsheetVisualizer {
+  private container: HTMLElement;
   private canvas: HTMLCanvasElement;
   private selectionCanvas: HTMLCanvasElement;
   private hoverCanvas: HTMLCanvasElement;
@@ -85,7 +86,8 @@ export class SpreadsheetVisualizer {
   private selectedCols: number[] = [];
 
   // Cache
-  private columnWidths: number[] = [];
+  private colWidths: number[] = [];
+  private colOffsets: number[] = [];
   private totalWidth = 0;
   private totalHeight = 0;
   private visibleRows = 0;
@@ -96,9 +98,12 @@ export class SpreadsheetVisualizer {
   private statsPanelWidth = 300; // Width of the stats panel
   private hasStatsPanel = false;
 
-  constructor(canvas: HTMLCanvasElement, dataProvider: DataProvider, options: Partial<SpreadsheetOptions> = {}) {
-    this.canvas = canvas;
-    this.ctx = canvas.getContext("2d")!;
+  constructor(container: HTMLElement, dataProvider: DataProvider, options: Partial<SpreadsheetOptions> = {}) {
+    this.container = container;
+
+    this.canvas = document.createElement("canvas");
+    this.container.appendChild(this.canvas);
+    this.ctx = this.canvas.getContext("2d")!;
 
     // Create and setup an overlay canvas for selection
     this.selectionCanvas = document.createElement("canvas");
@@ -110,7 +115,7 @@ export class SpreadsheetVisualizer {
     this.selectionCtx = this.selectionCanvas.getContext("2d", { alpha: true })!;
 
     // Insert selection canvas after the main canvas
-    canvas.parentElement?.insertBefore(this.selectionCanvas, canvas.nextSibling);
+    this.container.insertBefore(this.selectionCanvas, this.canvas.nextSibling);
 
     // Create and setup an overlay canvas for hover
     this.hoverCanvas = document.createElement("canvas");
@@ -122,7 +127,7 @@ export class SpreadsheetVisualizer {
     this.hoverCtx = this.hoverCanvas.getContext("2d", { alpha: true })!;
 
     // Insert hover canvas after the main canvas
-    canvas.parentElement?.insertBefore(this.hoverCanvas, canvas.nextSibling);
+    this.container.insertBefore(this.hoverCanvas, this.canvas.nextSibling);
 
     // Initialize data provider
     this.dataProvider = dataProvider;
@@ -132,8 +137,7 @@ export class SpreadsheetVisualizer {
     this.totalCols = 0;
 
     // Get container dimensions
-    const container = canvas.parentElement;
-    const containerRect = container?.getBoundingClientRect();
+    const containerRect = this.container?.getBoundingClientRect();
     const containerWidth = containerRect?.width ?? options.maxWidth ?? DEFAULT_MAX_WIDTH;
     const containerHeight = containerRect?.height ?? options.maxHeight ?? DEFAULT_MAX_HEIGHT;
 
@@ -198,7 +202,7 @@ export class SpreadsheetVisualizer {
     statsContainer.style.transition = "transform 0.2s ease-in-out";
     statsContainer.style.transform = "translateX(100%)";
     statsContainer.style.zIndex = "1000";
-    canvas.parentElement?.appendChild(statsContainer);
+    this.container.appendChild(statsContainer);
 
     // Add styles to handle the container layout
     const style = document.createElement("style");
@@ -216,7 +220,7 @@ export class SpreadsheetVisualizer {
         flex-shrink: 0;
       }
     `;
-    canvas.parentElement?.appendChild(style);
+    this.container.appendChild(style);
 
     this.statsVisualizer = new ColumnStatsVisualizer(statsContainer, dataProvider);
   }
@@ -247,19 +251,9 @@ export class SpreadsheetVisualizer {
   }
 
   private async updateLayout() {
-    if (!this.canvas.parentElement) return;
-
-    const container = this.canvas.parentElement;
-    const containerWidth = Math.floor(container.clientWidth);
-    const containerHeight = Math.floor(container.clientHeight);
-
-    // Calculate canvas dimensions based on options and container size
-    let width = this.options.width ?? containerWidth;
-    let height = this.options.height ?? containerHeight;
-
     // Apply constraints
-    width = Math.floor(minMax(width, this.options.minWidth, this.options.maxWidth));
-    height = Math.floor(minMax(height, this.options.minHeight, this.options.maxHeight));
+    let width = Math.floor(minMax(this.container.clientWidth, this.options.minWidth, this.options.maxWidth));
+    const height = Math.floor(minMax(this.container.clientHeight, this.options.minHeight, this.options.maxHeight));
 
     if (this.hasStatsPanel) {
       // Adjust canvas width to make room for stats panel
@@ -312,24 +306,30 @@ export class SpreadsheetVisualizer {
     const hasScrollbar = minTotalWidth > availableWidth;
 
     // Calculate minimum widths based on content
-    this.columnWidths = this.columns.map((col) => {
+    this.colWidths = this.columns.map((col) => {
       const headerWidth = this.ctx.measureText(col.header).width + this.options.cellPadding * 2;
       return Math.max(headerWidth, this.options.minCellWidth);
     });
 
     // Calculate total width
-    this.totalWidth = this.columnWidths.reduce((sum, width) => sum + width, 0) + this.options.rowHeaderWidth;
+    this.totalWidth = this.colWidths.reduce((sum, width) => sum + width, 0) + this.options.rowHeaderWidth;
 
     // If we have extra space, distribute it proportionally
     if (this.totalWidth < availableWidth) {
       const extraWidth = availableWidth - this.totalWidth;
-      const totalMinWidth = this.columnWidths.reduce((sum, width) => sum + width, 0);
-      this.columnWidths = this.columnWidths.map((width) => width + (width / totalMinWidth) * extraWidth);
+      const totalMinWidth = this.colWidths.reduce((sum, width) => sum + width, 0);
+      this.colWidths = this.colWidths.map((width) => width + (width / totalMinWidth) * extraWidth);
       this.totalWidth = availableWidth;
     }
 
     // Update visible columns
     this.visibleCols = Math.ceil(availableWidth / (this.totalWidth / this.columns.length));
+
+    // Calculate column offsets
+    this.colOffsets = [this.options.rowHeaderWidth];
+    for (let i = 1; i < this.columns.length; i++) {
+      this.colOffsets.push(this.colOffsets[i - 1] + this.colWidths[i - 1]);
+    }
   }
 
   private calculateRowHeight() {
@@ -351,21 +351,19 @@ export class SpreadsheetVisualizer {
     // Calculate visible area
     const visibleStartRow = Math.floor(this.scrollY / this.options.cellHeight);
     const visibleEndRow = Math.min(visibleStartRow + Math.ceil(height / this.options.cellHeight), this.totalRows);
-    const visibleStartCol = Math.floor(this.scrollX / (this.totalWidth / this.columns.length));
-    const visibleEndCol = Math.min(visibleStartCol + this.visibleCols, this.totalCols);
 
     switch (this.toDraw) {
       //@ts-ignore: if cells is selected, fall through to selection
       case ToDraw.Cells:
-        await this.drawCells(visibleStartRow, visibleEndRow, visibleStartCol, visibleEndCol);
+        await this.drawCells(visibleStartRow, visibleEndRow);
         this.drawScrollbars();
 
       //@ts-ignore: if cells is selected, fall through to hover
       case ToDraw.Selection:
-        this.drawSelection(visibleStartRow, visibleEndRow, visibleStartCol, visibleEndCol);
+        this.drawSelection(visibleStartRow);
 
       case ToDraw.CellHover:
-        this.drawCellHover(visibleStartCol, visibleEndCol, visibleStartRow, visibleEndRow);
+        this.drawCellHover(visibleStartRow);
         break;
 
       // case ToDraw.RowHover:
@@ -373,7 +371,7 @@ export class SpreadsheetVisualizer {
       //   break;
 
       case ToDraw.ColHover:
-        this.drawColHover(visibleStartCol, visibleEndCol);
+        this.drawColHover();
         break;
 
       default:
@@ -607,7 +605,7 @@ export class SpreadsheetVisualizer {
             startCol: event.shiftKey ? startCol : col - 1,
             endCol: event.shiftKey ? col - 1 : col - 1,
           };
-          this.scrollX = Math.max(0, this.getColumnOffset(col - 1) - this.canvas.width / 2);
+          this.scrollX = Math.max(0, this.colOffsets[col - 1] - this.canvas.width / 2);
 
           this.updateToDraw(ToDraw.Cells);
         }
@@ -621,7 +619,7 @@ export class SpreadsheetVisualizer {
             startCol: event.shiftKey ? startCol : col + 1,
             endCol: event.shiftKey ? col + 1 : col + 1,
           };
-          this.scrollX = Math.max(0, this.getColumnOffset(col + 1) - this.canvas.width / 2);
+          this.scrollX = Math.max(0, this.colOffsets[col + 1] - this.canvas.width / 2);
 
           this.updateToDraw(ToDraw.Cells);
         }
@@ -660,8 +658,26 @@ export class SpreadsheetVisualizer {
     return x <= this.options.rowHeaderWidth;
   }
 
-  private getColumnOffset(col: number): number {
-    return this.columnWidths.slice(0, col).reduce((sum, width) => sum + width, 0) + this.options.rowHeaderWidth;
+  private getFirstVisibleCol(): number {
+    for (let i = 0; i < this.columns.length; i++) {
+      if (this.colOffsets[i] >= this.scrollX) {
+        return i == 0 ? 0 : i - 1;
+      }
+    }
+
+    return 0;
+  }
+
+  private getLastVisibleCol(): number {
+    const firstVisibleCol = this.getFirstVisibleCol();
+
+    for (let i = firstVisibleCol; i < this.columns.length; i++) {
+      if (this.colOffsets[i] + this.colWidths[i] > this.scrollX + this.canvas.width) {
+        return i;
+      }
+    }
+
+    return this.columns.length - 1;
   }
 
   private async copySelection() {
@@ -728,9 +744,9 @@ export class SpreadsheetVisualizer {
     // Find the column
     let colOffset = this.options.rowHeaderWidth;
     let col = 0;
-    for (; col < this.columnWidths.length; col++) {
-      if (adjustedX < colOffset + this.columnWidths[col]) break;
-      colOffset += this.columnWidths[col];
+    for (; col < this.colWidths.length; col++) {
+      if (adjustedX < colOffset + this.colWidths[col]) break;
+      colOffset += this.colWidths[col];
     }
 
     // Find the row
@@ -744,12 +760,15 @@ export class SpreadsheetVisualizer {
     return null;
   }
 
-  private async drawCells(startRow: number, endRow: number, startCol: number, endCol: number) {
+  private async drawCells(startRow: number, endRow: number) {
     const { ctx, canvas } = this;
     const { width, height } = canvas;
 
+    const firstVisibleCol = this.getFirstVisibleCol();
+    const lastVisibleCol = this.getLastVisibleCol();
+
     // Get the data before clearing the canvas
-    const data = await this.dataProvider.fetchData(startRow, endRow, startCol, endCol);
+    const data = await this.dataProvider.fetchData(startRow, endRow, firstVisibleCol, lastVisibleCol);
 
     // Clear the canvas
     ctx.clearRect(0, 0, width, height);
@@ -759,87 +778,98 @@ export class SpreadsheetVisualizer {
     ctx.fillRect(0, 0, width, this.options.cellHeight);
     ctx.fillRect(0, 0, this.options.rowHeaderWidth, height);
 
-    // Draw column headers
+    // Common settings for text
     ctx.font = `${this.options.headerFontSize}px ${this.options.fontFamily}`;
     ctx.fillStyle = this.options.headerTextColor;
     ctx.textBaseline = "middle";
+
+    // Draw column headers
     ctx.textAlign = "left";
+    ctx.strokeStyle = this.options.borderColor;
 
-    let x = this.options.rowHeaderWidth;
-    for (let col = startCol; col < endCol; col++) {
-      if (x + this.columnWidths[col] > 0 && x < width) {
-        // Trim the text to the column width
-        const textWidth = ctx.measureText(this.columns[col].header).width;
-        const availableWidth = this.columnWidths[col] - this.options.cellPadding * 2;
-        const availableTextLength = Math.floor((availableWidth / textWidth) * this.columns[col].header.length);
-        const text = this.columns[col].header.slice(0, availableTextLength);
+    let x = this.colOffsets[firstVisibleCol] - this.scrollX;
+    for (let col = firstVisibleCol; col <= lastVisibleCol; col++) {
+      ctx.strokeRect(x, 0, this.colWidths[col], this.options.cellHeight);
 
-        const textX = x + this.options.cellPadding;
-        const textY = this.options.cellHeight >> 1; // Divide by 2 to center the text
+      const textWidth = ctx.measureText(this.columns[col].header).width;
+      const availableWidth = this.colWidths[col] - this.options.cellPadding * 2;
+      const availableTextLength = Math.floor((availableWidth / textWidth) * this.columns[col].header.length);
+      const text = this.columns[col].header.slice(0, availableTextLength);
 
-        ctx.fillText(text, textX, textY, availableWidth);
-      }
-      x += this.columnWidths[col];
-    }
+      const textX = x + this.options.cellPadding;
+      const textY = this.options.cellHeight >> 1; // Divide by 2 to center the text
 
-    // Draw row indices
-    ctx.textAlign = "right";
-    let y = this.options.cellHeight; // Keep the header at the top
-    for (let row = startRow; row < endRow; row++) {
-      if (y + this.options.cellHeight > 0 && y < height) {
-        const text = (row + 1).toString();
-        const textX = this.options.rowHeaderWidth - this.options.cellPadding;
-        const textY = y + this.options.cellHeight / 2;
-        ctx.fillText(text, textX, textY);
-      }
-      y += this.options.cellHeight;
+      ctx.strokeText(text, textX, textY, availableWidth);
+      ctx.fillText(text, textX, textY, availableWidth);
+
+      x += this.colWidths[col];
     }
 
     // Draw cells
-    ctx.textAlign = "left";
-    ctx.font = `${this.options.fontSize}px ${this.options.fontFamily}`;
-    ctx.fillStyle = this.options.cellTextColor;
-
-    y = this.options.cellHeight; // Keep the header at the top
+    let y = this.options.cellHeight; // Keep the header at the top
     for (let row = 0; row < data.length; row++) {
-      x = this.options.rowHeaderWidth; // Keep the row indices at the left
+      x = this.colOffsets[firstVisibleCol] - this.scrollX;
       for (let col = 0; col < data[row].length; col++) {
-        const cellWidth = this.columnWidths[col + startCol];
-        const column = this.columns[col + startCol];
+        const cellWidth = this.colWidths[col + firstVisibleCol];
+        const column = this.columns[col + firstVisibleCol];
 
-        if (x + cellWidth > 0 && x < width && y + this.options.cellHeight > 0 && y < height) {
-          // Draw cell background
-          ctx.fillStyle = this.options.cellBackgroundColor;
-          ctx.fillRect(x, y, cellWidth, this.options.cellHeight);
+        // Draw cell background
+        ctx.fillStyle = this.options.cellBackgroundColor;
+        ctx.fillRect(x, y, cellWidth, this.options.cellHeight);
 
-          // Draw cell text
-          ctx.fillStyle = this.options.cellTextColor;
-          const text = this.formatCellValue(data[row][col]);
-          // const textWidth = ctx.measureText(text).width;
-          const textX = x + this.options.cellPadding;
-          const textY = y + this.options.cellHeight / 2;
+        // Draw cell text
+        ctx.fillStyle = this.options.cellTextColor;
+        const text = this.formatCellValue(data[row][col]);
+        const textX = x + this.options.cellPadding;
+        const textY = y + this.options.cellHeight / 2;
 
-          // Align text based on data type
-          if (column.dataType === "number" || column.dataType === "date" || column.dataType === "datetime") {
-            ctx.textAlign = "right";
-            ctx.fillText(text, x + cellWidth - this.options.cellPadding, textY);
-          } else {
-            ctx.textAlign = "left";
-            ctx.fillText(text, textX, textY);
-          }
-
-          // Draw cell border
-          ctx.strokeStyle = this.options.borderColor;
-          ctx.strokeRect(x, y, cellWidth, this.options.cellHeight);
+        // Align text based on data type
+        if (column.dataType === "number" || column.dataType === "date" || column.dataType === "datetime") {
+          ctx.textAlign = "right";
+          ctx.fillText(text, x + cellWidth - this.options.cellPadding, textY);
+        } else {
+          ctx.textAlign = "left";
+          ctx.fillText(text, textX, textY);
         }
+
+        // Draw cell border
+        ctx.strokeStyle = this.options.borderColor;
+        ctx.strokeRect(x, y, cellWidth, this.options.cellHeight);
 
         x += cellWidth;
       }
       y += this.options.cellHeight;
     }
+
+    // Draw row indices
+    ctx.strokeStyle = this.options.borderColor;
+
+    ctx.textAlign = "right";
+    const textX = this.options.rowHeaderWidth - this.options.cellPadding;
+
+    // Top left corner
+    ctx.fillStyle = this.options.headerBackgroundColor;
+    ctx.fillRect(0, 0, this.options.rowHeaderWidth, this.options.cellHeight);
+    ctx.strokeRect(0, 0, this.options.rowHeaderWidth, this.options.cellHeight);
+
+    y = this.options.cellHeight; // Keep the header at the top
+    for (let row = startRow; row < endRow; row++) {
+      ctx.fillStyle = this.options.headerBackgroundColor;
+      ctx.fillRect(0, y, this.options.rowHeaderWidth, this.options.cellHeight);
+
+      ctx.strokeRect(0, y, this.options.rowHeaderWidth, this.options.cellHeight);
+
+      const textY = y + this.options.cellHeight / 2;
+      ctx.fillStyle = this.options.headerTextColor;
+
+      ctx.strokeText((row + 1).toString(), textX, textY);
+      ctx.fillText((row + 1).toString(), textX, textY);
+
+      y += this.options.cellHeight;
+    }
   }
 
-  private drawCellHover(startCol: number, _: number, startRow: number, endRow: number) {
+  private drawCellHover(visibleStartRow: number) {
     // Clear the hover canvas
     this.hoverCtx.clearRect(0, 0, this.hoverCanvas.width, this.hoverCanvas.height);
 
@@ -849,17 +879,23 @@ export class SpreadsheetVisualizer {
     if (this.hoveredCell) {
       const { row, col } = this.hoveredCell;
 
-      const x = this.columnWidths.slice(startCol, col).reduce((sum, width) => sum + width, 0) + this.options.rowHeaderWidth;
-      const y = (row - startRow) * this.options.cellHeight;
-      const width = this.columnWidths[col];
+      const y = (row - visibleStartRow) * this.options.cellHeight;
       const height = this.options.cellHeight;
+
+      let x = this.colOffsets[col] - this.scrollX;
+      let width = this.colWidths[col];
+
+      if (x < this.options.rowHeaderWidth) {
+        x = this.options.rowHeaderWidth;
+        width = this.colOffsets[col + 1] - this.scrollX - this.options.rowHeaderWidth;
+      }
 
       this.hoverCtx.fillRect(x, y, width, height);
       this.hoverCtx.strokeRect(x, y, width, height);
     }
   }
 
-  private drawColHover(startCol: number, endCol: number) {
+  private drawColHover() {
     // Clear the hover canvas
     this.hoverCtx.clearRect(0, 0, this.hoverCanvas.width, this.hoverCanvas.height);
 
@@ -869,15 +905,17 @@ export class SpreadsheetVisualizer {
     if (this.hoveredCell) {
       const { col } = this.hoveredCell;
 
-      if (col < startCol || col > endCol) return;
+      const height = this.hoverCanvas.height - this.options.scrollbarWidth;
 
-      const x = this.columnWidths.slice(startCol, col).reduce((sum, width) => sum + width, 0) + this.options.rowHeaderWidth;
-      const y = 0;
-      const width = this.columnWidths[col];
-      const height = this.selectionCanvas.height - this.options.scrollbarWidth;
+      let x = this.colOffsets[col] - this.scrollX;
+      let width = this.colWidths[col];
+      if (x < this.options.rowHeaderWidth) {
+        x = this.options.rowHeaderWidth;
+        width = this.colOffsets[col + 1] - this.scrollX - this.options.rowHeaderWidth;
+      }
 
-      this.hoverCtx.fillRect(x, y, width, height);
-      this.hoverCtx.strokeRect(x, y, width, height);
+      this.hoverCtx.fillRect(x, 0, width, height);
+      this.hoverCtx.strokeRect(x, 0, width, height);
     }
   }
 
@@ -904,16 +942,15 @@ export class SpreadsheetVisualizer {
   //   }
   // }
 
-  private drawSelection(startRow: number, endRow: number, startCol: number, endCol: number) {
+  private drawSelection(visibleStartRow: number) {
     // Clear the selection canvas
     this.selectionCtx.clearRect(0, 0, this.selectionCanvas.width, this.selectionCanvas.height);
 
-    // this.drawCellSelection();
-    this.drawColSelection(startCol, endCol);
-    // this.drawRowSelection(startRow, endRow);
+    this.drawCellSelection(visibleStartRow);
+    this.drawColSelection();
   }
 
-  private drawCellSelection(visibleStartRow: number, visibleEndRow: number, visibleStartCol: number, visibleEndCol: number) {
+  private drawCellSelection(visibleStartRow: number) {
     // Draw selection
     if (this.selectedCells) {
       const { startRow, endRow, startCol, endCol } = this.selectedCells;
@@ -924,12 +961,18 @@ export class SpreadsheetVisualizer {
       const minCol = Math.min(startCol, endCol);
       const maxCol = Math.max(startCol, endCol);
 
+      const height = this.options.cellHeight;
+
       for (let row = minRow; row <= maxRow; row++) {
         for (let col = minCol; col <= maxCol; col++) {
-          const x = this.getColumnOffset(col) - this.scrollX;
-          const y = row * this.options.cellHeight - this.scrollY;
-          const width = this.columnWidths[col];
-          const height = this.options.cellHeight;
+          const y = (row - visibleStartRow) * this.options.cellHeight;
+
+          let x = this.colOffsets[col] - this.scrollX;
+          let width = this.colWidths[col];
+          if (x < this.options.rowHeaderWidth) {
+            x = this.options.rowHeaderWidth;
+            width = this.colOffsets[col + 1] - this.scrollX - this.options.rowHeaderWidth;
+          }
 
           if (x + width > 0 && x < this.canvas.width && y + height > 0 && y < this.canvas.height) {
             this.selectionCtx.fillRect(x, y, width, height);
@@ -937,37 +980,26 @@ export class SpreadsheetVisualizer {
         }
       }
     }
-
-    // // Draw hover
-    // if (this.hoveredCell) {
-    //   const { row, col } = this.hoveredCell;
-    //   this.hoverCtx.fillStyle = this.options.hoverColor;
-
-    //   const x = col === -1 ? 0 : this.getColumnOffset(col) - this.scrollX;
-    //   const y = row * this.options.cellHeight - this.scrollY;
-    //   const width = col === -1 ? this.options.rowHeaderWidth : this.columnWidths[col];
-    //   const height = this.options.cellHeight;
-
-    //   if (x + width > 0 && x < this.canvas.width && y + height > 0 && y < this.canvas.height) {
-    //     this.selectionCtx.fillRect(x, y, width, height);
-    //   }
-    // }
   }
 
-  private drawColSelection(startCol: number, endCol: number) {
+  private drawColSelection() {
     this.selectionCtx.fillStyle = this.options.selectionColor;
     this.selectionCtx.strokeStyle = this.options.borderColor;
 
+    const height = this.selectionCanvas.height - this.options.scrollbarWidth;
     this.selectedCols.forEach((col) => {
-      if (col < startCol || col > endCol) return;
+      // Skip if the column is not visible
+      if (this.colOffsets[col + 1] - this.scrollX < this.options.rowHeaderWidth) return;
 
-      const x = this.columnWidths.slice(startCol, col).reduce((sum, width) => sum + width, 0) + this.options.rowHeaderWidth;
-      const y = 0;
-      const width = this.columnWidths[col];
-      const height = this.selectionCanvas.height - this.options.scrollbarWidth;
+      let x = this.colOffsets[col] - this.scrollX;
+      let width = this.colWidths[col];
+      if (x < this.options.rowHeaderWidth) {
+        x = this.options.rowHeaderWidth;
+        width = this.colOffsets[col + 1] - this.scrollX - this.options.rowHeaderWidth;
+      }
 
-      this.selectionCtx.fillRect(x, y, width, height);
-      this.selectionCtx.strokeRect(x, y, width, height);
+      this.selectionCtx.fillRect(x, 0, width, height);
+      this.selectionCtx.strokeRect(x, 0, width, height);
     });
   }
 
@@ -992,15 +1024,18 @@ export class SpreadsheetVisualizer {
     const { ctx, canvas } = this;
     const { width, height } = canvas;
 
+    const hasVerticalScrollbar = this.totalHeight > height;
+    const hasHorizontalScrollbar = this.totalWidth > width;
+
     // Draw vertical scrollbar
-    if (this.totalHeight > height) {
+    if (hasVerticalScrollbar) {
       const scrollbarHeight = (height / this.totalHeight) * height;
       const scrollbarY = (this.scrollY / this.totalHeight) * height;
       const scrollbarX = width - this.options.scrollbarWidth;
 
       // Draw track
       ctx.fillStyle = this.options.scrollbarColor;
-      ctx.fillRect(scrollbarX, 0, this.options.scrollbarWidth, height);
+      ctx.fillRect(scrollbarX, 0, this.options.scrollbarWidth, height - (hasHorizontalScrollbar ? this.options.scrollbarWidth : 0));
 
       // Draw thumb
       ctx.fillStyle =
@@ -1011,7 +1046,7 @@ export class SpreadsheetVisualizer {
     }
 
     // Draw horizontal scrollbar
-    if (this.totalWidth > width) {
+    if (hasHorizontalScrollbar) {
       const scrollbarWidth = (width / this.totalWidth) * width;
       const scrollbarX = (this.scrollX / this.totalWidth) * width;
       const scrollbarY = height - this.options.scrollbarWidth;
@@ -1025,7 +1060,12 @@ export class SpreadsheetVisualizer {
         this.mouseState === MouseState.HoveringHorizontalScrollbar || this.mouseState === MouseState.DraggingHorizontalScrollbar
           ? this.options.scrollbarHoverColor
           : this.options.scrollbarThumbColor;
-      ctx.fillRect(scrollbarX, scrollbarY, scrollbarWidth, this.options.scrollbarWidth);
+      ctx.fillRect(
+        scrollbarX,
+        scrollbarY,
+        scrollbarWidth - (hasVerticalScrollbar ? this.options.scrollbarWidth : 0),
+        this.options.scrollbarWidth
+      );
     }
   }
 }
