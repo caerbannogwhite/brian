@@ -91,13 +91,16 @@ export class SpreadsheetVisualizer {
   private colOffsets: number[] = [];
   private totalWidth = 0;
   private totalHeight = 0;
+  private totalScrollY = 0;
+  private totalScrollX = 0;
   private visibleRows = 0;
   private visibleCols = 0;
   private dataCache: Map<string, any[][]> = new Map();
 
-  private statsVisualizer: ColumnStatsVisualizer | null = null;
+  // Stats panel
   private statsPanelWidth = 300; // Width of the stats panel
   private hasStatsPanel = false;
+  private statsVisualizer: ColumnStatsVisualizer;
 
   // Context menu for export options
   private contextMenu: ContextMenu;
@@ -299,8 +302,6 @@ export class SpreadsheetVisualizer {
 
   private calculateColumnWidths() {
     const availableWidth = this.canvas.width - this.options.rowHeaderWidth;
-    const minTotalWidth = this.columns.length * this.options.minCellWidth;
-    const hasScrollbar = minTotalWidth > availableWidth;
 
     // Calculate minimum widths based on content
     this.colWidths = this.columns.map((col) => {
@@ -308,25 +309,29 @@ export class SpreadsheetVisualizer {
       return Math.max(headerWidth, this.options.minCellWidth);
     });
 
-    // Calculate total width
-    this.totalWidth = this.colWidths.reduce((sum, width) => sum + width, 0) + this.options.rowHeaderWidth;
-
-    // If we have extra space, distribute it proportionally
-    if (this.totalWidth < availableWidth) {
-      const extraWidth = availableWidth - this.totalWidth;
-      const totalMinWidth = this.colWidths.reduce((sum, width) => sum + width, 0);
-      this.colWidths = this.colWidths.map((width) => width + (width / totalMinWidth) * extraWidth);
-      this.totalWidth = availableWidth;
-    }
-
-    // Update visible columns
-    this.visibleCols = Math.ceil(availableWidth / (this.totalWidth / this.columns.length));
-
     // Calculate column offsets
     this.colOffsets = [this.options.rowHeaderWidth];
     for (let i = 1; i < this.columns.length; i++) {
       this.colOffsets.push(this.colOffsets[i - 1] + this.colWidths[i - 1]);
     }
+
+    // Calculate total width
+    this.totalWidth = this.colOffsets[this.colOffsets.length - 1] + this.colWidths[this.colWidths.length - 1];
+
+    const hasScrollbar = this.totalWidth > availableWidth;
+
+    // TODO: check if this is needed
+    // // If we have extra space, distribute it proportionally
+    // if (this.totalWidth < availableWidth) {
+    //   const extraWidth = availableWidth - this.totalWidth;
+    //   this.colWidths = this.colWidths.map((width) => width + (width / this.totalWidth) * extraWidth);
+    //   this.totalWidth = availableWidth;
+    // }
+
+    this.totalScrollX = this.totalWidth - this.canvas.width + (hasScrollbar ? this.options.scrollbarWidth : 0);
+
+    // Update visible columns
+    this.visibleCols = Math.ceil(availableWidth / (this.totalWidth / this.columns.length));
   }
 
   private calculateRowHeight() {
@@ -335,6 +340,11 @@ export class SpreadsheetVisualizer {
     const hasScrollbar = minTotalHeight > availableHeight;
 
     this.totalHeight = this.totalRows * this.options.cellHeight;
+    this.totalScrollY =
+      this.totalHeight -
+      this.canvas.height +
+      this.options.cellHeight * 2 + // header
+      (hasScrollbar ? this.options.scrollbarWidth : 0);
   }
 
   private updateToDraw(newToDraw: ToDraw) {
@@ -542,20 +552,23 @@ export class SpreadsheetVisualizer {
 
     // Zoom
     if (event.ctrlKey) {
-      const zoomFactor = event.deltaY > 0 ? 0.9 : 1.1;
-      this.options.fontSize = Math.max(8, Math.min(24, this.options.fontSize * zoomFactor));
-      this.options.headerFontSize = Math.max(8, Math.min(24, this.options.headerFontSize * zoomFactor));
-      this.calculateColumnWidths();
-
-      this.updateToDraw(ToDraw.Cells);
+      // TODO: implement zoom
+      // const zoomFactor = event.deltaY > 0 ? 0.9 : 1.1;
+      // this.options.fontSize = Math.max(8, Math.min(24, this.options.fontSize * zoomFactor));
+      // this.options.headerFontSize = Math.max(8, Math.min(24, this.options.headerFontSize * zoomFactor));
+      // this.calculateColumnWidths();
+      // this.updateToDraw(ToDraw.Cells);
     }
 
     // Scroll
     else {
-      this.scrollY = minMax(this.scrollY + event.deltaY, 0, this.totalHeight);
-      this.scrollX = minMax(this.scrollX + event.deltaX, 0, this.totalWidth);
+      const prevScrollY = this.scrollY;
+      const prevScrollX = this.scrollX;
 
-      if ((this.scrollY > 0 && this.scrollY < this.totalHeight) || (this.scrollX > 0 && this.scrollX < this.totalWidth)) {
+      this.scrollY = minMax(this.scrollY + event.deltaY, 0, this.totalScrollY);
+      this.scrollX = minMax(this.scrollX + event.deltaX, 0, this.totalScrollX);
+
+      if (prevScrollY !== this.scrollY || prevScrollX !== this.scrollX) {
         this.updateToDraw(ToDraw.Cells);
       }
     }
@@ -570,18 +583,26 @@ export class SpreadsheetVisualizer {
     const row = event.shiftKey ? endRow : startRow;
     const col = event.shiftKey ? endCol : startCol;
 
+    const prevScrollY = this.scrollY;
+    const prevScrollX = this.scrollX;
+
     switch (event.key) {
       case "ArrowUp":
-        if (row > 0) {
-          this.selectedCells = {
-            startRow: event.shiftKey ? startRow : row - 1,
-            endRow: event.shiftKey ? row - 1 : row - 1,
-            startCol: event.shiftKey ? startCol : col,
-            endCol: event.shiftKey ? endCol : col,
-          };
-          this.scrollY = Math.max(0, (row - 1) * this.options.cellHeight - this.canvas.height / 2);
+        this.selectedCells = {
+          startRow: event.shiftKey ? startRow : row - 1,
+          endRow: event.shiftKey ? row - 1 : row - 1,
+          startCol: event.shiftKey ? startCol : col,
+          endCol: event.shiftKey ? endCol : col,
+        };
 
+        this.selectedCells.startRow = Math.max(1, this.selectedCells.startRow);
+        this.selectedCells.endRow = Math.max(1, this.selectedCells.endRow);
+
+        this.scrollY = minMax((row - 1) * this.options.cellHeight - this.canvas.height / 2, 0, this.totalScrollY);
+        if (prevScrollY !== this.scrollY) {
           this.updateToDraw(ToDraw.Cells);
+        } else {
+          this.updateToDraw(ToDraw.Selection);
         }
         break;
 
@@ -592,36 +613,53 @@ export class SpreadsheetVisualizer {
           startCol: event.shiftKey ? startCol : col,
           endCol: event.shiftKey ? endCol : col,
         };
-        this.scrollY = Math.max(0, (row + 1) * this.options.cellHeight - this.canvas.height / 2);
 
-        this.updateToDraw(ToDraw.Cells);
+        this.selectedCells.startRow = Math.min(this.totalRows, this.selectedCells.startRow);
+        this.selectedCells.endRow = Math.min(this.totalRows, this.selectedCells.endRow);
+
+        this.scrollY = minMax((row + 1) * this.options.cellHeight - this.canvas.height / 2, 0, this.totalScrollY);
+        if (prevScrollY !== this.scrollY) {
+          this.updateToDraw(ToDraw.Cells);
+        } else {
+          this.updateToDraw(ToDraw.Selection);
+        }
         break;
 
       case "ArrowLeft":
-        if (col > 0) {
-          this.selectedCells = {
-            startRow: event.shiftKey ? startRow : row,
-            endRow: event.shiftKey ? endRow : row,
-            startCol: event.shiftKey ? startCol : col - 1,
-            endCol: event.shiftKey ? col - 1 : col - 1,
-          };
-          this.scrollX = Math.max(0, this.colOffsets[col - 1] - this.canvas.width / 2);
+        this.selectedCells = {
+          startRow: event.shiftKey ? startRow : row,
+          endRow: event.shiftKey ? endRow : row,
+          startCol: event.shiftKey ? startCol : col - 1,
+          endCol: event.shiftKey ? col - 1 : col - 1,
+        };
 
+        this.selectedCells.startCol = Math.max(0, this.selectedCells.startCol);
+        this.selectedCells.endCol = Math.max(0, this.selectedCells.endCol);
+
+        this.scrollX = minMax(this.colOffsets[col] - this.canvas.width / 2, 0, this.totalScrollX);
+        if (prevScrollX !== this.scrollX) {
           this.updateToDraw(ToDraw.Cells);
+        } else {
+          this.updateToDraw(ToDraw.Selection);
         }
         break;
 
       case "ArrowRight":
-        if (col < this.columns.length - 1) {
-          this.selectedCells = {
-            startRow: event.shiftKey ? startRow : row,
-            endRow: event.shiftKey ? endRow : row,
-            startCol: event.shiftKey ? startCol : col + 1,
-            endCol: event.shiftKey ? col + 1 : col + 1,
-          };
-          this.scrollX = Math.max(0, this.colOffsets[col + 1] - this.canvas.width / 2);
+        this.selectedCells = {
+          startRow: event.shiftKey ? startRow : row,
+          endRow: event.shiftKey ? endRow : row,
+          startCol: event.shiftKey ? startCol : col + 1,
+          endCol: event.shiftKey ? col + 1 : col + 1,
+        };
 
+        this.selectedCells.startCol = Math.min(this.totalCols - 1, this.selectedCells.startCol);
+        this.selectedCells.endCol = Math.min(this.totalCols - 1, this.selectedCells.endCol);
+
+        this.scrollX = minMax(this.colOffsets[col] - this.canvas.width / 2, 0, this.totalScrollX);
+        if (prevScrollX !== this.scrollX) {
           this.updateToDraw(ToDraw.Cells);
+        } else {
+          this.updateToDraw(ToDraw.Selection);
         }
         break;
 
