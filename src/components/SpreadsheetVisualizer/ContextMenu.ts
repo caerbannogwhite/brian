@@ -74,8 +74,8 @@ export class ContextMenu {
   }
 
   public async show(event: MouseEvent) {
-    event.stopPropagation();
     event.preventDefault();
+    event.stopPropagation();
 
     const selectedCells = this.getSelectedCells();
 

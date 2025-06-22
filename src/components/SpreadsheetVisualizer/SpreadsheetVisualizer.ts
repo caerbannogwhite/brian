@@ -30,6 +30,7 @@ import { Column, SpreadsheetOptions, DataProvider } from "./types";
 import { minMax } from "./utils/drawing";
 import { throttle } from "./utils/throttle";
 import { ColumnStatsVisualizer } from "../ColumnStatsVisualizer/ColumnStatsVisualizer";
+import { ContextMenu } from "./ContextMenu";
 
 type RequiredSpreadsheetOptions = Omit<Required<SpreadsheetOptions>, "height" | "width"> & {
   height: number;
@@ -97,6 +98,9 @@ export class SpreadsheetVisualizer {
   private statsVisualizer: ColumnStatsVisualizer | null = null;
   private statsPanelWidth = 300; // Width of the stats panel
   private hasStatsPanel = false;
+
+  // Context menu for export options
+  private contextMenu: ContextMenu;
 
   constructor(container: HTMLElement, dataProvider: DataProvider, options: Partial<SpreadsheetOptions> = {}) {
     this.container = container;
@@ -223,6 +227,9 @@ export class SpreadsheetVisualizer {
     this.container.appendChild(style);
 
     this.statsVisualizer = new ColumnStatsVisualizer(statsContainer, dataProvider);
+
+    // Create context menu for export options
+    this.contextMenu = new ContextMenu(dataProvider, this.options, () => this.selectedCells);
   }
 
   public async initialize() {
@@ -242,12 +249,16 @@ export class SpreadsheetVisualizer {
     this.canvas.addEventListener("mouseup", this.handleMouseUp.bind(this));
     this.canvas.addEventListener("mouseleave", this.handleMouseLeave.bind(this));
     this.canvas.addEventListener("wheel", (event) => this.handleWheel(event).catch(console.error));
+    this.canvas.addEventListener("contextmenu", (event) => this.contextMenu.show(event).catch(console.error));
 
     // Keyboard events
     window.addEventListener("keydown", (event) => this.handleKeyDown(event).catch(console.error));
 
     // Window events
     window.addEventListener("resize", () => this.handleResize().catch(console.error));
+
+    // Hide context menu when clicking outside
+    document.addEventListener("click", () => this.contextMenu.hide());
   }
 
   private async updateLayout() {
@@ -392,8 +403,7 @@ export class SpreadsheetVisualizer {
       this.dragStartY = y;
       this.lastScrollY = this.scrollY;
 
-      // This is handled in the mouse move event
-      // this.updateToDraw(ToDraw.Cells);
+      return;
     }
 
     // Horizontal Scrolling
@@ -402,8 +412,7 @@ export class SpreadsheetVisualizer {
       this.dragStartX = x;
       this.lastScrollX = this.scrollX;
 
-      // This is handled in the mouse move event
-      // this.updateToDraw(ToDraw.Cells);
+      return;
     }
 
     // Column Header
@@ -450,6 +459,11 @@ export class SpreadsheetVisualizer {
 
     // Handle cell selection
     else {
+      // Right click is handled by the context menu
+      if (event.button === 2) {
+        return;
+      }
+
       const cell = this.getCellAtPosition(x, y);
       if (cell) {
         this.mouseState = MouseState.Dragging;
@@ -627,7 +641,7 @@ export class SpreadsheetVisualizer {
 
       case "c":
         if (event.ctrlKey || event.metaKey) {
-          this.copySelection();
+          this.contextMenu.exportAsCSV();
         }
         break;
     }
@@ -678,54 +692,6 @@ export class SpreadsheetVisualizer {
     }
 
     return this.columns.length - 1;
-  }
-
-  private async copySelection() {
-    if (!this.selectedCells) return;
-
-    const { startRow, endRow, startCol, endCol } = this.selectedCells;
-    const data = await this.dataProvider.fetchData(
-      Math.min(startRow, endRow),
-      Math.max(startRow, endRow) + 1,
-      Math.min(startCol, endCol),
-      Math.max(startCol, endCol) + 1
-    );
-
-    const text = data.map((row) => row.map((cell) => this.formatCellValue(cell)).join("\t")).join("\n");
-
-    try {
-      await navigator.clipboard.writeText(text);
-    } catch (err) {
-      console.error("Failed to copy to clipboard:", err);
-    }
-  }
-
-  private formatCellValue(value: any): string {
-    if (value === null || value === undefined) return "NA";
-    if (typeof value === "string") return value;
-    if (typeof value === "number") return value.toLocaleString(undefined, this.options.numberFormat);
-    if (value instanceof Date) {
-      const format = value.getHours() === 0 && value.getMinutes() === 0 ? this.options.dateFormat : this.options.datetimeFormat;
-      return format.replace(/yyyy|MM|dd|HH|mm|ss/g, (match) => {
-        switch (match) {
-          case "yyyy":
-            return value.getFullYear().toString();
-          case "MM":
-            return (value.getMonth() + 1).toString().padStart(2, "0");
-          case "dd":
-            return value.getDate().toString().padStart(2, "0");
-          case "HH":
-            return value.getHours().toString().padStart(2, "0");
-          case "mm":
-            return value.getMinutes().toString().padStart(2, "0");
-          case "ss":
-            return value.getSeconds().toString().padStart(2, "0");
-          default:
-            return match;
-        }
-      });
-    }
-    return String(value);
   }
 
   private getCellAtPosition(x: number, y: number): { row: number; col: number } | null {
@@ -819,7 +785,7 @@ export class SpreadsheetVisualizer {
 
         // Draw cell text
         ctx.fillStyle = this.options.cellTextColor;
-        const text = this.formatCellValue(data[row][col]);
+        const text = formatCellValue(data[row][col], this.options);
         const textX = x + this.options.cellPadding;
         const textY = y + this.options.cellHeight / 2;
 
@@ -1069,3 +1035,33 @@ export class SpreadsheetVisualizer {
     }
   }
 }
+
+export const formatCellValue = (value: any, options: SpreadsheetOptions): string => {
+  if (value === null || value === undefined) return "NA";
+  if (typeof value === "string") return value;
+  if (typeof value === "number") return value.toLocaleString(undefined, options.numberFormat);
+  if (value instanceof Date) {
+    const format = value.getHours() === 0 && value.getMinutes() === 0 ? options.dateFormat : options.datetimeFormat;
+    if (!format) return "NA";
+
+    return format.replace(/yyyy|MM|dd|HH|mm|ss/g, (match) => {
+      switch (match) {
+        case "yyyy":
+          return value.getFullYear().toString();
+        case "MM":
+          return (value.getMonth() + 1).toString().padStart(2, "0");
+        case "dd":
+          return value.getDate().toString().padStart(2, "0");
+        case "HH":
+          return value.getHours().toString().padStart(2, "0");
+        case "mm":
+          return value.getMinutes().toString().padStart(2, "0");
+        case "ss":
+          return value.getSeconds().toString().padStart(2, "0");
+        default:
+          return match;
+      }
+    });
+  }
+  return String(value);
+};
