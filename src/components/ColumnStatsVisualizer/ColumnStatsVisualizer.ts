@@ -18,10 +18,25 @@ export class ColumnStatsVisualizer {
   private currentColumn: Column | null = null;
   private stats: ColumnStats | null = null;
 
-  constructor(container: HTMLElement, dataProvider: DataProvider) {
-    this.container = container;
+  constructor(parent: HTMLElement, dataProvider: DataProvider, statsPanelWidth: number) {
+    this.container = document.createElement("div");
     this.dataProvider = dataProvider;
+
     this.container.style.display = "none";
+
+    this.container.id = "column-stats-container";
+    this.container.style.position = "absolute";
+    this.container.style.top = "0";
+    this.container.style.right = "0";
+    this.container.style.width = `${statsPanelWidth}px`;
+    this.container.style.height = "100%";
+    this.container.style.backgroundColor = "white";
+    this.container.style.boxShadow = "-2px 0 4px rgba(0,0,0,0.1)";
+    this.container.style.transition = "transform 0.2s ease-in-out";
+    this.container.style.transform = "translateX(100%)";
+    this.container.style.zIndex = "1000";
+
+    parent.appendChild(this.container);
   }
 
   public async showStats(column: Column) {
@@ -286,11 +301,10 @@ export class ColumnStatsVisualizer {
           <div class="histogram-title">Top 10 Most Frequent Values</div>
           <div class="histogram">
             ${sortedCounts
-              .map(
-                ([value, count]) => {
-                  const percentage = ((count / totalValidValues) * 100).toFixed(1);
-                  const displayValue = value.length > 15 ? value.substring(0, 15) + "..." : value;
-                  return `
+              .map(([value, count]) => {
+                const percentage = ((count / totalValidValues) * 100).toFixed(1);
+                const displayValue = value.length > 15 ? value.substring(0, 15) + "..." : value;
+                return `
                 <div class="histogram-bar-container">
                   <div class="histogram-label" title="${value}">${displayValue}</div>
                   <div class="histogram-bar">
@@ -299,8 +313,7 @@ export class ColumnStatsVisualizer {
                   <div class="histogram-count">${count.toLocaleString()} (${percentage}%)</div>
                 </div>
               `;
-                }
-              )
+              })
               .join("")}
           </div>
         </div>

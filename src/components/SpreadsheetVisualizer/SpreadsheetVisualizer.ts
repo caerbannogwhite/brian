@@ -193,21 +193,7 @@ export class SpreadsheetVisualizer {
     // Initialize throttled mouse move handler (16ms = ~60fps)
     this.throttledMouseMove = throttle(this.handleMouseMove.bind(this), 16);
 
-    // Create stats container
-    const statsContainer = document.createElement("div");
-    statsContainer.id = "column-stats-container";
-    statsContainer.style.position = "absolute";
-    statsContainer.style.top = "0";
-    statsContainer.style.right = "0";
-    statsContainer.style.width = `${this.statsPanelWidth}px`;
-    statsContainer.style.height = "100%";
-    statsContainer.style.backgroundColor = "white";
-    statsContainer.style.boxShadow = "-2px 0 4px rgba(0,0,0,0.1)";
-    statsContainer.style.transition = "transform 0.2s ease-in-out";
-    statsContainer.style.transform = "translateX(100%)";
-    statsContainer.style.zIndex = "1000";
-    this.container.appendChild(statsContainer);
-
+    // TODO: put this somewhere else?
     // Add styles to handle the container layout
     const style = document.createElement("style");
     style.textContent = `
@@ -226,7 +212,7 @@ export class SpreadsheetVisualizer {
     `;
     this.container.appendChild(style);
 
-    this.statsVisualizer = new ColumnStatsVisualizer(statsContainer, dataProvider);
+    this.statsVisualizer = new ColumnStatsVisualizer(this.container, dataProvider, this.statsPanelWidth);
 
     // Create context menu for export options
     this.contextMenu = new ContextMenu(dataProvider, this.options, () => this.selectedCells);
