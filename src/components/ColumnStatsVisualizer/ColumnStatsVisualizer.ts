@@ -55,8 +55,10 @@ export class ColumnStatsVisualizer {
   private async calculateStats() {
     if (!this.currentColumn) return;
 
-    const totalRows = await this.dataProvider.getTotalRows();
-    const columns = await this.dataProvider.getColumns();
+    const metadata = await this.dataProvider.getMetadata();
+
+    const totalRows = metadata.totalRows;
+    const columns = metadata.columns;
     const columnIndex = columns.findIndex((col) => col.key === this.currentColumn!.key);
 
     if (columnIndex === -1) return;

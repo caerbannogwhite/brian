@@ -1,4 +1,4 @@
-import { datasetDm } from "./data";
+import { datasetDm } from "./data.ts";
 import { SpreadsheetVisualizer } from "./components/SpreadsheetVisualizer";
 import { CdiscDataProvider } from "./data/providers/CdiscDataProvider";
 import { type CdiscDataset } from "./data/types";

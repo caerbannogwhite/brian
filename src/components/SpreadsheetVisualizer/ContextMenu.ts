@@ -117,7 +117,7 @@ export class ContextMenu {
     if (!selectedCells) return;
 
     const { startRow, endRow, startCol, endCol } = selectedCells;
-    const columns = await this.dataProvider.getColumns();
+    const columns = (await this.dataProvider.getMetadata()).columns;
     const data = await this.dataProvider.fetchData(
       Math.min(startRow, endRow),
       Math.max(startRow, endRow),
@@ -169,7 +169,7 @@ export class ContextMenu {
     if (!selectedCells) return;
 
     const { startRow, endRow, startCol, endCol } = selectedCells;
-    const columns = await this.dataProvider.getColumns();
+    const columns = (await this.dataProvider.getMetadata()).columns;
     const data = await this.dataProvider.fetchData(
       Math.min(startRow, endRow),
       Math.max(startRow, endRow),
@@ -211,7 +211,7 @@ export class ContextMenu {
     if (!selectedCells) return;
 
     const { startRow, endRow, startCol, endCol } = selectedCells;
-    const columns = await this.dataProvider.getColumns();
+    const columns = (await this.dataProvider.getMetadata()).columns;
 
     const data = await this.dataProvider.fetchData(
       Math.min(startRow, endRow),

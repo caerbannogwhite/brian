@@ -1,8 +1,19 @@
 export interface Column {
   header: string;
   key: string;
+  label?: string;
   dataType: "string" | "number" | "date" | "datetime" | "boolean" | "null";
+  length?: number;
   format?: string | Intl.NumberFormatOptions;
+}
+
+export interface DatasetMetadata {
+  name: string;
+  fileName?: string;
+  description?: string;
+  totalRows: number;
+  totalColumns: number;
+  columns: Column[];
 }
 
 export interface CellStyle {
@@ -58,10 +69,8 @@ export interface SpreadsheetOptions {
 }
 
 export interface DataProvider {
+  getMetadata(): Promise<DatasetMetadata>;
   fetchData(startRow: number, endRow: number, startCol: number, endCol: number): Promise<any[][]>;
-  getColumns(): Promise<Column[]>;
-  getTotalRows(): Promise<number>;
-  getTotalColumns(): Promise<number>;
 }
 
 export interface CellPosition {

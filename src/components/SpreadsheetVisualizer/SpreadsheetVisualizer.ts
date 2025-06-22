@@ -222,9 +222,11 @@ export class SpreadsheetVisualizer {
   }
 
   public async initialize() {
-    this.columns = await this.dataProvider.getColumns();
-    this.totalRows = await this.dataProvider.getTotalRows();
-    this.totalCols = await this.dataProvider.getTotalColumns();
+    const metadata = await this.dataProvider.getMetadata();
+
+    this.columns = metadata.columns;
+    this.totalRows = metadata.totalRows;
+    this.totalCols = metadata.totalColumns;
 
     this.setupEventListeners();
     await this.updateLayout();
