@@ -1,5 +1,5 @@
 export interface Column {
-  header: string;
+  name: string;
   key: string;
   label?: string;
   dataType: "string" | "number" | "date" | "datetime" | "boolean" | "null";

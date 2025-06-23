@@ -30,26 +30,28 @@ export interface CdiscDataset {
 }
 
 export function getColumns(dataset: CdiscDataset) {
-  return dataset.columns.map(col => ({
-    header: col.label,
+  return dataset.columns.map((col) => ({
+    name: col.name,
+    label: col.label,
+    length: col.length,
     key: col.name,
     dataType: mapDataType(col.dataType),
-    format: col.format
+    format: col.format,
   }));
 }
 
-function mapDataType(cdiscType: string): 'string' | 'number' | 'date' | 'datetime' | 'boolean' | 'null' {
+function mapDataType(cdiscType: string): "string" | "number" | "date" | "datetime" | "boolean" | "null" {
   switch (cdiscType.toLowerCase()) {
-    case 'integer':
-    case 'decimal':
-      return 'number';
-    case 'date':
-      return 'date';
-    case 'datetime':
-      return 'datetime';
-    case 'boolean':
-      return 'boolean';
+    case "integer":
+    case "decimal":
+      return "number";
+    case "date":
+      return "date";
+    case "datetime":
+      return "datetime";
+    case "boolean":
+      return "boolean";
     default:
-      return 'string';
+      return "string";
   }
-} 
+}

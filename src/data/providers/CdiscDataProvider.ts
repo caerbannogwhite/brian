@@ -1,4 +1,4 @@
-import { Column, DataProvider, DatasetMetadata } from "../../components/SpreadsheetVisualizer/types";
+import { DataProvider, DatasetMetadata } from "../../components/SpreadsheetVisualizer/types";
 import { CdiscDataset, getColumns } from "../types";
 
 export class CdiscDataProvider implements DataProvider {
@@ -11,7 +11,6 @@ export class CdiscDataProvider implements DataProvider {
   async getMetadata(): Promise<DatasetMetadata> {
     return {
       name: this.dataset.name,
-      // description: this.dataset.description,
       totalRows: this.dataset.rows.length,
       totalColumns: this.dataset.columns.length,
       columns: getColumns(this.dataset),

@@ -109,7 +109,8 @@ export class ColumnStatsVisualizer {
     this.container.innerHTML = `
       <div class="column-stats">
         <div class="stats-header">
-          <h3>${this.currentColumn.header}</h3>
+          <h3>${this.currentColumn.name}</h3>
+          ${this.currentColumn.label ? `<div class="column-label">${this.currentColumn.label}</div>` : ""}
           <div class="column-type">${this.currentColumn.dataType}</div>
         </div>
         <div class="stats-container">
@@ -136,8 +137,14 @@ export class ColumnStatsVisualizer {
       }
       .stats-header h3 {
         margin: 0;
-        font-size: 1.2rem;
+        font-size: 1rem;
         color: #333;
+      }
+      .column-label {
+        font-size: 0.85rem;
+        color: #555;
+        margin-top: 0.25rem;
+        font-style: italic;
       }
       .column-type {
         font-size: 0.8rem;
@@ -157,16 +164,18 @@ export class ColumnStatsVisualizer {
         background: #f8f9fa;
         border-radius: 6px;
         border: 1px solid #eee;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
       }
       .stat-label {
         font-size: 0.75rem;
         color: #666;
         text-transform: uppercase;
         letter-spacing: 0.5px;
-        margin-bottom: 0.25rem;
       }
       .stat-value {
-        font-size: 1.1rem;
+        font-size: 1rem;
         font-weight: 600;
         color: #333;
         font-family: 'SF Mono', 'Consolas', monospace;
@@ -190,10 +199,11 @@ export class ColumnStatsVisualizer {
         display: flex;
         align-items: center;
         gap: 0.5rem;
+        min-height: 20px;
       }
       .histogram-label {
-        width: 120px;
-        font-size: 0.8rem;
+        width: 100px;
+        font-size: 0.75rem;
         color: #666;
         text-align: right;
         overflow: hidden;
@@ -202,6 +212,7 @@ export class ColumnStatsVisualizer {
         padding-right: 0.5rem;
         cursor: pointer;
         transition: color 0.2s ease;
+        flex-shrink: 0;
       }
       .histogram-label:hover {
         color: #2196f3;
@@ -209,7 +220,7 @@ export class ColumnStatsVisualizer {
       }
       .histogram-bar {
         flex: 1;
-        height: 24px;
+        height: 16px;
         background: #e3f2fd;
         border-radius: 4px;
         position: relative;
@@ -222,10 +233,12 @@ export class ColumnStatsVisualizer {
         transition: width 0.3s ease-out;
       }
       .histogram-count {
-        min-width: 80px;
+        width: 60px;
         font-size: 0.8rem;
         color: #666;
         font-family: 'SF Mono', 'Consolas', monospace;
+        flex-shrink: 0;
+        text-align: right;
       }
     `;
     this.container.appendChild(style);
@@ -291,18 +304,19 @@ export class ColumnStatsVisualizer {
 
     // For categorical data, show horizontal histogram of top 10 values
     if (this.currentColumn?.dataType !== "number") {
-      const sortedCounts = Array.from(this.stats.valueCounts.entries())
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 10);
+      const sortedCounts = Array.from(this.stats.valueCounts.entries()).sort((a, b) => b[1] - a[1]);
+      const top10 = sortedCounts.slice(0, 10);
 
       const maxCount = Math.max(...sortedCounts.map(([_, count]) => count));
       const totalValidValues = this.stats.totalCount - this.stats.nullCount;
 
+      const categoriesNumber = sortedCounts.length;
+
       return `
         <div class="histogram-container">
-          <div class="histogram-title">Top 10 Most Frequent Values</div>
+          <div class="histogram-title">Top ${categoriesNumber > 10 ? 10 : categoriesNumber} Most Frequent Values</div>
           <div class="histogram">
-            ${sortedCounts
+            ${top10
               .map(([value, count]) => {
                 const percentage = ((count / totalValidValues) * 100).toFixed(1);
                 const displayValue = value.length > 15 ? value.substring(0, 15) + "..." : value;
@@ -318,6 +332,7 @@ export class ColumnStatsVisualizer {
               })
               .join("")}
           </div>
+          ${categoriesNumber > 10 ? `<div class="histogram-title">${(categoriesNumber - 10).toLocaleString()} more categories.</div>` : ""}
         </div>
       `;
     }
