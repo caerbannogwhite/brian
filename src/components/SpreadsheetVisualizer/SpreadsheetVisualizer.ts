@@ -100,12 +100,17 @@ export class SpreadsheetVisualizer {
   // Stats panel
   private statsPanelWidth = 350; // Width of the stats panel
   private hasStatsPanel = false;
-  private statsVisualizer: ColumnStatsVisualizer;
+  private statsVisualizer: ColumnStatsVisualizer | null;
 
   // Context menu for export options
   private contextMenu: ContextMenu;
 
-  constructor(container: HTMLElement, dataProvider: DataProvider, options: Partial<SpreadsheetOptions> = {}) {
+  constructor(
+    container: HTMLElement, 
+    dataProvider: DataProvider, 
+    options: Partial<SpreadsheetOptions> = {},
+    statsVisualizer?: ColumnStatsVisualizer
+  ) {
     this.container = container;
 
     this.canvas = document.createElement("canvas");
@@ -215,7 +220,14 @@ export class SpreadsheetVisualizer {
     `;
     this.container.appendChild(style);
 
-    this.statsVisualizer = new ColumnStatsVisualizer(this.container, dataProvider, this.statsPanelWidth);
+    // Use provided stats visualizer or create a new one
+    if (statsVisualizer) {
+      this.statsVisualizer = statsVisualizer;
+      // Update the data provider for the shared stats visualizer
+      this.statsVisualizer.setDataProvider(dataProvider);
+    } else {
+      this.statsVisualizer = new ColumnStatsVisualizer(this.container, dataProvider, this.statsPanelWidth);
+    }
 
     // Create context menu for export options
     this.contextMenu = new ContextMenu(dataProvider, this.options, () => this.selectedCells);
@@ -237,7 +249,7 @@ export class SpreadsheetVisualizer {
 
   public hide(): void {
     this.container.style.display = "none";
-    this.statsVisualizer.hide();
+    this.statsVisualizer?.hide();
   }
 
   private setupEventListeners() {

@@ -14,11 +14,11 @@ interface ColumnStats {
 
 export class ColumnStatsVisualizer {
   private container: HTMLElement;
-  private dataProvider: DataProvider;
+  private dataProvider: DataProvider | null;
   private currentColumn: Column | null = null;
   private stats: ColumnStats | null = null;
 
-  constructor(parent: HTMLElement, dataProvider: DataProvider, statsPanelWidth: number) {
+  constructor(parent: HTMLElement, dataProvider: DataProvider | null, statsPanelWidth: number) {
     this.container = document.createElement("div");
     this.dataProvider = dataProvider;
 
@@ -39,7 +39,16 @@ export class ColumnStatsVisualizer {
     parent.appendChild(this.container);
   }
 
+  public setDataProvider(dataProvider: DataProvider) {
+    this.dataProvider = dataProvider;
+  }
+
   public async showStats(column: Column) {
+    if (!this.dataProvider) {
+      console.warn("No data provider set for ColumnStatsVisualizer");
+      return;
+    }
+    
     this.currentColumn = column;
     this.container.style.display = "block";
     await this.calculateStats();
@@ -53,7 +62,7 @@ export class ColumnStatsVisualizer {
   }
 
   private async calculateStats() {
-    if (!this.currentColumn) return;
+    if (!this.currentColumn || !this.dataProvider) return;
 
     const metadata = await this.dataProvider.getMetadata();
 

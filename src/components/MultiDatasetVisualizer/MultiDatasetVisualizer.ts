@@ -1,6 +1,7 @@
 import { SpreadsheetVisualizer } from "../SpreadsheetVisualizer";
 import { DataProvider } from "../SpreadsheetVisualizer/types";
 import { SpreadsheetOptions } from "../SpreadsheetVisualizer/types";
+import { ColumnStatsVisualizer } from "../ColumnStatsVisualizer/ColumnStatsVisualizer";
 
 interface DatasetTab {
   id: string;
@@ -18,6 +19,7 @@ export class MultiDatasetVisualizer {
   private tabs: DatasetTab[] = [];
   private activeTabId: string | null = null;
   private options: SpreadsheetOptions;
+  private sharedStatsVisualizer: ColumnStatsVisualizer;
 
   constructor(parent: HTMLElement, options: SpreadsheetOptions = {}) {
     this.container = document.createElement("div");
@@ -48,6 +50,9 @@ export class MultiDatasetVisualizer {
     this.container.appendChild(this.tabsContainer);
     this.container.appendChild(this.contentContainer);
     parent.appendChild(this.container);
+
+    // Create shared stats visualizer
+    this.sharedStatsVisualizer = new ColumnStatsVisualizer(this.container, null, 350);
   }
 
   public async addDataset(id: string, name: string, dataProvider: DataProvider): Promise<void> {
@@ -58,8 +63,13 @@ export class MultiDatasetVisualizer {
     datasetContainer.style.display = "none"; // Initially hidden
     this.contentContainer.appendChild(datasetContainer);
 
-    // Create spreadsheet visualizer for this dataset
-    const spreadsheetVisualizer = new SpreadsheetVisualizer(datasetContainer, dataProvider, this.options);
+    // Create spreadsheet visualizer for this dataset with shared stats visualizer
+    const spreadsheetVisualizer = new SpreadsheetVisualizer(
+      datasetContainer, 
+      dataProvider, 
+      this.options,
+      this.sharedStatsVisualizer
+    );
 
     const tab: DatasetTab = {
       id,
@@ -115,6 +125,8 @@ export class MultiDatasetVisualizer {
       } else {
         this.activeTabId = null;
         this.contentContainer.innerHTML = "";
+        // Hide stats visualizer when no datasets are active
+        this.sharedStatsVisualizer.hide();
       }
     }
 
@@ -217,6 +229,9 @@ export class MultiDatasetVisualizer {
       this.activeTabId = id;
       newTab.container.style.display = "block";
       this.updateTabStyles(id, true);
+      
+      // Update the data provider for the shared stats visualizer
+      this.sharedStatsVisualizer.setDataProvider(newTab.dataProvider);
     }
   }
 
