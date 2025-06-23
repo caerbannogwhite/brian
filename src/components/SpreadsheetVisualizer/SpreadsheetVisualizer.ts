@@ -1,6 +1,7 @@
 import {
   DEFAULT_MAX_WIDTH,
   DEFAULT_MIN_HEIGHT,
+  DEFAULT_MAX_HEIGHT,
   DEFAULT_MIN_WIDTH,
   DEFAULT_CELL_HEIGHT,
   DEFAULT_CELL_PADDING,
@@ -25,7 +26,6 @@ import {
   DEFAULT_NUMBER_FORMAT,
   DEFAULT_BORDER_WIDTH,
 } from "./defaults";
-import { DEFAULT_MAX_HEIGHT } from "./defaults";
 import { Column, SpreadsheetOptions, DataProvider } from "./types";
 import { minMax } from "./utils/drawing";
 import { throttle } from "./utils/throttle";
@@ -98,7 +98,7 @@ export class SpreadsheetVisualizer {
   private dataCache: Map<string, any[][]> = new Map();
 
   // Stats panel
-  private statsPanelWidth = 300; // Width of the stats panel
+  private statsPanelWidth = 350; // Width of the stats panel
   private hasStatsPanel = false;
   private statsVisualizer: ColumnStatsVisualizer;
 
@@ -223,14 +223,21 @@ export class SpreadsheetVisualizer {
 
   public async initialize() {
     const metadata = await this.dataProvider.getMetadata();
-
     this.columns = metadata.columns;
     this.totalRows = metadata.totalRows;
     this.totalCols = metadata.totalColumns;
 
     this.setupEventListeners();
     await this.updateLayout();
-    await this.draw();
+  }
+
+  public show(): void {
+    this.container.style.display = "block";
+  }
+
+  public hide(): void {
+    this.container.style.display = "none";
+    this.statsVisualizer.hide();
   }
 
   private setupEventListeners() {
@@ -307,7 +314,7 @@ export class SpreadsheetVisualizer {
 
     // Calculate minimum widths based on content
     this.colWidths = this.columns.map((col) => {
-      const headerWidth = this.ctx.measureText(col.header).width + this.options.cellPadding * 2;
+      const headerWidth = this.ctx.measureText(col.name).width + this.options.cellPadding * 2;
       return Math.max(headerWidth, this.options.minCellWidth);
     });
 
@@ -490,14 +497,14 @@ export class SpreadsheetVisualizer {
       case MouseState.DraggingVerticalScrollbar:
         const deltaY = y - this.dragStartY;
         const scrollRatioY = deltaY / (this.canvas.height - this.options.scrollbarWidth);
-        this.scrollY = Math.max(0, this.lastScrollY + scrollRatioY * this.totalHeight);
+        this.scrollY = minMax(this.lastScrollY + scrollRatioY * this.totalScrollY, 0, this.totalScrollY);
         this.updateToDraw(ToDraw.Cells);
         break;
 
       case MouseState.DraggingHorizontalScrollbar:
         const deltaX = x - this.dragStartX;
         const scrollRatioX = deltaX / (this.canvas.width - this.options.scrollbarWidth);
-        this.scrollX = Math.max(0, this.lastScrollX + scrollRatioX * this.totalWidth);
+        this.scrollX = minMax(this.lastScrollX + scrollRatioX * this.totalScrollX, 0, this.totalScrollX);
         this.updateToDraw(ToDraw.Cells);
         break;
 
@@ -783,10 +790,10 @@ export class SpreadsheetVisualizer {
     for (let col = firstVisibleCol; col <= lastVisibleCol; col++) {
       ctx.strokeRect(x, 0, this.colWidths[col], this.options.cellHeight);
 
-      const textWidth = ctx.measureText(this.columns[col].header).width;
+      const textWidth = ctx.measureText(this.columns[col].name).width;
       const availableWidth = this.colWidths[col] - this.options.cellPadding * 2;
-      const availableTextLength = Math.floor((availableWidth / textWidth) * this.columns[col].header.length);
-      const text = this.columns[col].header.slice(0, availableTextLength);
+      const availableTextLength = Math.floor((availableWidth / textWidth) * this.columns[col].name.length);
+      const text = this.columns[col].name.slice(0, availableTextLength);
 
       const textX = x + this.options.cellPadding;
       const textY = this.options.cellHeight >> 1; // Divide by 2 to center the text
