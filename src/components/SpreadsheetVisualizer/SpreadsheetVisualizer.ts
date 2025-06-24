@@ -204,8 +204,9 @@ export class SpreadsheetVisualizer {
     // Use provided stats visualizer or create a new one
     if (statsVisualizer) {
       this.statsVisualizer = statsVisualizer;
-      // Update the data provider for the shared stats visualizer
-      this.statsVisualizer.setDataProvider(dataProvider);
+      // Update the data provider for the shared stats visualizer (no columns selected initially)
+      // Note: Not awaiting since we're in constructor and no columns are selected yet
+      this.statsVisualizer.setDataProvider(dataProvider, []).catch(console.error);
     } else {
       this.statsVisualizer = new ColumnStatsVisualizer(this.container, dataProvider, this.statsPanelWidth);
     }
@@ -231,6 +232,10 @@ export class SpreadsheetVisualizer {
   public hide(): void {
     this.container.style.display = "none";
     this.statsVisualizer?.hide();
+  }
+
+  public getSelectedColumns(): Column[] {
+    return this.selectedCols.map(colIndex => this.columns[colIndex]).filter(col => col !== undefined);
   }
 
   private setupEventListeners() {
@@ -419,11 +424,14 @@ export class SpreadsheetVisualizer {
       if (!cell) return;
       const { col } = cell;
 
+      let hasStatusPanelChanged = false;
       if (this.selectedCols.includes(col)) {
         this.selectedCols = this.selectedCols.filter((i) => i !== col);
         this.statsVisualizer?.hide();
         this.hasStatsPanel = false;
+        hasStatusPanelChanged = true;
       } else {
+        hasStatusPanelChanged = !this.hasStatsPanel;
         if (this.singleColSelectionMode) {
           this.selectedCols = [col]; // Only allow one column selection at a time
         } else {
@@ -437,7 +445,9 @@ export class SpreadsheetVisualizer {
       }
 
       this.updateToDraw(ToDraw.Selection);
-      this.updateLayout();
+      if (hasStatusPanelChanged) {
+        this.updateLayout();
+      }
     }
 
     // Row Index
