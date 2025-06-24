@@ -23,29 +23,16 @@ export class MultiDatasetVisualizer {
 
   constructor(parent: HTMLElement, options: SpreadsheetOptions = {}) {
     this.container = document.createElement("div");
+    this.container.className = "multi-dataset-visualizer";
     this.options = options;
-
-    this.container.style.display = "flex";
-    this.container.style.flexDirection = "column";
-    this.container.style.height = "100%";
-    this.container.style.width = "100%";
-    this.container.style.overflow = "hidden";
 
     // Create tabs container
     this.tabsContainer = document.createElement("div");
-    this.tabsContainer.style.display = "flex";
-    this.tabsContainer.style.backgroundColor = "#f5f5f5";
-    this.tabsContainer.style.borderBottom = "1px solid #ddd";
-    this.tabsContainer.style.overflowX = "auto";
-    this.tabsContainer.style.overflowY = "hidden";
-    this.tabsContainer.style.minHeight = "40px";
-    this.tabsContainer.style.maxHeight = "40px";
+    this.tabsContainer.className = "multi-dataset-visualizer__tabs-container";
 
     // Create content container
     this.contentContainer = document.createElement("div");
-    this.contentContainer.style.flex = "1";
-    this.contentContainer.style.overflow = "hidden";
-    this.contentContainer.style.position = "relative";
+    this.contentContainer.className = "multi-dataset-visualizer__content-container";
 
     this.container.appendChild(this.tabsContainer);
     this.container.appendChild(this.contentContainer);
@@ -58,9 +45,7 @@ export class MultiDatasetVisualizer {
   public async addDataset(id: string, name: string, dataProvider: DataProvider): Promise<void> {
     // Create a separate container for this dataset's spreadsheet visualizer
     const datasetContainer = document.createElement("div");
-    datasetContainer.style.width = "100%";
-    datasetContainer.style.height = "100%";
-    datasetContainer.style.display = "none"; // Initially hidden
+    datasetContainer.className = "multi-dataset-visualizer__dataset-container";
     this.contentContainer.appendChild(datasetContainer);
 
     // Create spreadsheet visualizer for this dataset with shared stats visualizer
@@ -145,44 +130,17 @@ export class MultiDatasetVisualizer {
   private createTabElement(tab: DatasetTab): void {
     const tabElement = document.createElement("div");
     tabElement.setAttribute("data-tab-id", tab.id);
-    tabElement.style.display = "flex";
-    tabElement.style.alignItems = "center";
-    tabElement.style.padding = "8px 16px";
-    tabElement.style.backgroundColor = "#e0e0e0";
-    tabElement.style.borderRight = "1px solid #ccc";
-    tabElement.style.cursor = "pointer";
-    tabElement.style.userSelect = "none";
-    tabElement.style.minWidth = "120px";
-    tabElement.style.maxWidth = "200px";
-    tabElement.style.position = "relative";
-    tabElement.style.transition = "background-color 0.2s ease";
+    tabElement.className = "multi-dataset-visualizer__tab";
 
     // Tab title
     const titleElement = document.createElement("span");
     titleElement.textContent = tab.name;
-    titleElement.style.flex = "1";
-    titleElement.style.overflow = "hidden";
-    titleElement.style.textOverflow = "ellipsis";
-    titleElement.style.whiteSpace = "nowrap";
-    titleElement.style.fontSize = "14px";
+    titleElement.className = "multi-dataset-visualizer__tab-title";
 
     // Close button
     const closeButton = document.createElement("button");
     closeButton.innerHTML = "×";
-    closeButton.style.background = "none";
-    closeButton.style.border = "none";
-    closeButton.style.fontSize = "16px";
-    closeButton.style.fontWeight = "bold";
-    closeButton.style.cursor = "pointer";
-    closeButton.style.marginLeft = "8px";
-    closeButton.style.padding = "0";
-    closeButton.style.width = "16px";
-    closeButton.style.height = "16px";
-    closeButton.style.display = "flex";
-    closeButton.style.alignItems = "center";
-    closeButton.style.justifyContent = "center";
-    closeButton.style.color = "#666";
-    closeButton.style.borderRadius = "2px";
+    closeButton.className = "multi-dataset-visualizer__tab-close";
 
     // Event listeners
     tabElement.addEventListener("click", (e) => {
@@ -196,16 +154,6 @@ export class MultiDatasetVisualizer {
       this.closeDataset(tab.id);
     });
 
-    closeButton.addEventListener("mouseenter", () => {
-      closeButton.style.backgroundColor = "#ff4444";
-      closeButton.style.color = "white";
-    });
-
-    closeButton.addEventListener("mouseleave", () => {
-      closeButton.style.backgroundColor = "transparent";
-      closeButton.style.color = "#666";
-    });
-
     tabElement.appendChild(titleElement);
     tabElement.appendChild(closeButton);
     this.tabsContainer.appendChild(tabElement);
@@ -217,7 +165,7 @@ export class MultiDatasetVisualizer {
       const currentTab = this.tabs.find((t) => t.id === this.activeTabId);
       if (currentTab) {
         currentTab.isActive = false;
-        currentTab.container.style.display = "none";
+        currentTab.container.classList.remove("multi-dataset-visualizer__dataset-container--active");
         this.updateTabStyles(this.activeTabId, false);
       }
     }
@@ -227,7 +175,7 @@ export class MultiDatasetVisualizer {
     if (newTab) {
       newTab.isActive = true;
       this.activeTabId = id;
-      newTab.container.style.display = "block";
+      newTab.container.classList.add("multi-dataset-visualizer__dataset-container--active");
       this.updateTabStyles(id, true);
       
       // Update the data provider for the shared stats visualizer
@@ -239,11 +187,9 @@ export class MultiDatasetVisualizer {
     const tabElement = this.tabsContainer.querySelector(`[data-tab-id="${tabId}"]`) as HTMLElement;
     if (tabElement) {
       if (isActive) {
-        tabElement.style.backgroundColor = "white";
-        tabElement.style.borderBottom = "2px solid #2196f3";
+        tabElement.classList.add("multi-dataset-visualizer__tab--active");
       } else {
-        tabElement.style.backgroundColor = "#e0e0e0";
-        tabElement.style.borderBottom = "none";
+        tabElement.classList.remove("multi-dataset-visualizer__tab--active");
       }
     }
   }

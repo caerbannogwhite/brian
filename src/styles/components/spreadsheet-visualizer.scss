@@ -1,0 +1,42 @@
+// SpreadsheetVisualizer Component Styles
+
+#spreadsheet-container {
+  position: relative;
+  display: flex;
+  width: 100%;
+  height: 100%;
+
+  canvas {
+    transition: width 0.2s ease-in-out;
+  }
+}
+
+#column-stats-container {
+  flex-shrink: 0;
+}
+
+// Canvas positioning
+#selection-canvas,
+#hover-canvas {
+  position: absolute;
+  pointer-events: none;
+}
+
+// Scrollbar styles (these are drawn on canvas, but we can define the colors here)
+.scrollbar {
+  &--vertical {
+    position: absolute;
+    right: 0;
+    top: 0;
+    width: 12px;
+    height: 100%;
+  }
+
+  &--horizontal {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 12px;
+  }
+} 

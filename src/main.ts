@@ -1,10 +1,11 @@
-import { datasetDm } from "./data.ts";
-import { SpreadsheetVisualizer } from "./components/SpreadsheetVisualizer";
+import "./styles/main.scss";
+import { datasetDm, datasetAe } from "./data.ts";
+import { MultiDatasetVisualizer } from "./components/MultiDatasetVisualizer";
 import { CdiscDataProvider } from "./data/providers/CdiscDataProvider";
 import { type CdiscDataset } from "./data/types";
 
-// Initialize the spreadsheet
-async function initSpreadsheet() {
+// Initialize the multi-dataset visualizer
+async function initMultiDatasetVisualizer() {
   const container = document.getElementById("spreadsheet-container");
   if (!container) return;
 
@@ -14,9 +15,7 @@ async function initSpreadsheet() {
   container.style.borderRadius = "4px";
   container.style.overflow = "hidden";
 
-  const dataProvider = new CdiscDataProvider(datasetDm as CdiscDataset);
-
-  const spreadsheetVisualizer = new SpreadsheetVisualizer(container, dataProvider, {
+  const multiDatasetVisualizer = new MultiDatasetVisualizer(container, {
     minHeight: 400,
     minWidth: 600,
 
@@ -26,8 +25,13 @@ async function initSpreadsheet() {
     numberFormat: { minimumFractionDigits: 2, maximumFractionDigits: 2 },
   });
 
-  await spreadsheetVisualizer.initialize();
+  // Add the first dataset
+  const dataProvider1 = new CdiscDataProvider(datasetDm as CdiscDataset);
+  await multiDatasetVisualizer.addDataset("dm", "Demographics", dataProvider1);
+
+  const dataProvider2 = new CdiscDataProvider(datasetAe as CdiscDataset);
+  await multiDatasetVisualizer.addDataset("ae", "Adverse Events", dataProvider2);
 }
 
 // Start the application
-initSpreadsheet().catch(console.error);
+initMultiDatasetVisualizer().catch(console.error);

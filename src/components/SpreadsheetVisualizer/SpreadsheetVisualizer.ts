@@ -106,8 +106,8 @@ export class SpreadsheetVisualizer {
   private contextMenu: ContextMenu;
 
   constructor(
-    container: HTMLElement, 
-    dataProvider: DataProvider, 
+    container: HTMLElement,
+    dataProvider: DataProvider,
     options: Partial<SpreadsheetOptions> = {},
     statsVisualizer?: ColumnStatsVisualizer
   ) {
@@ -200,25 +200,6 @@ export class SpreadsheetVisualizer {
 
     // Initialize throttled mouse move handler (16ms = ~60fps)
     this.throttledMouseMove = throttle(this.handleMouseMove.bind(this), 16);
-
-    // TODO: put this somewhere else?
-    // Add styles to handle the container layout
-    const style = document.createElement("style");
-    style.textContent = `
-      #spreadsheet-container {
-        position: relative;
-        display: flex;
-        width: 100%;
-        height: 100%;
-      }
-      #spreadsheet-container canvas {
-        transition: width 0.2s ease-in-out;
-      }
-      #column-stats-container {
-        flex-shrink: 0;
-      }
-    `;
-    this.container.appendChild(style);
 
     // Use provided stats visualizer or create a new one
     if (statsVisualizer) {
