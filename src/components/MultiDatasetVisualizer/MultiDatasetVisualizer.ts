@@ -49,12 +49,7 @@ export class MultiDatasetVisualizer {
     this.contentContainer.appendChild(datasetContainer);
 
     // Create spreadsheet visualizer for this dataset with shared stats visualizer
-    const spreadsheetVisualizer = new SpreadsheetVisualizer(
-      datasetContainer, 
-      dataProvider, 
-      this.options,
-      this.sharedStatsVisualizer
-    );
+    const spreadsheetVisualizer = new SpreadsheetVisualizer(datasetContainer, dataProvider, this.options, this.sharedStatsVisualizer);
 
     const tab: DatasetTab = {
       id,
@@ -177,9 +172,10 @@ export class MultiDatasetVisualizer {
       this.activeTabId = id;
       newTab.container.classList.add("multi-dataset-visualizer__dataset-container--active");
       this.updateTabStyles(id, true);
-      
-      // Update the data provider for the shared stats visualizer
-      this.sharedStatsVisualizer.setDataProvider(newTab.dataProvider);
+
+      // Update the data provider for the shared stats visualizer with selected columns
+      const selectedColumns = newTab.spreadsheetVisualizer.getSelectedColumns();
+      await this.sharedStatsVisualizer.setDataProvider(newTab.dataProvider, selectedColumns);
     }
   }
 

@@ -28,8 +28,17 @@ export class ColumnStatsVisualizer {
     parent.appendChild(this.container);
   }
 
-  public setDataProvider(dataProvider: DataProvider) {
+    public async setDataProvider(dataProvider: DataProvider, selectedColumns: Column[] = []) {
     this.dataProvider = dataProvider;
+    
+    // Handle the data provider change with the selected columns from the new dataset
+    if (selectedColumns.length > 0) {
+      // Show stats for the first selected column (assuming single column selection mode)
+      await this.showStats(selectedColumns[0]);
+    } else {
+      // No columns selected in the new dataset, hide the stats panel
+      this.hide();
+    }
   }
 
   public async showStats(column: Column) {
@@ -37,7 +46,7 @@ export class ColumnStatsVisualizer {
       console.warn("No data provider set for ColumnStatsVisualizer");
       return;
     }
-    
+
     this.currentColumn = column;
     this.container.style.display = "block";
     this.container.classList.add("visible");
@@ -143,7 +152,10 @@ export class ColumnStatsVisualizer {
       stats.push(`
         <div class="column-stats__item">
           <div class="column-stats__label">Min</div>
-          <div class="column-stats__value">${this.stats.min.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+          <div class="column-stats__value">${this.stats.min.toLocaleString(undefined, {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+          })}</div>
         </div>
         <div class="column-stats__item">
           <div class="column-stats__label">Mean</div>
@@ -168,7 +180,10 @@ export class ColumnStatsVisualizer {
         </div>
         <div class="column-stats__item">
           <div class="column-stats__label">Max</div>
-          <div class="column-stats__value">${this.stats.max!.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+          <div class="column-stats__value">${this.stats.max!.toLocaleString(undefined, {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+          })}</div>
         </div>
       `);
     }
