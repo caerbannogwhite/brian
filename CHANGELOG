@@ -1,8 +1,15 @@
-v0.2.0:
+v0.3.0:
+ - [Feature] Multi-dataset support: visualize multiple datasets in different tabs
+ - [Feature] Export selection menu: CSV, TSV, HTML and Markdown
+ - [Feature] DataProvider interface updated to include metadata
+ - [Enhanced] Column stats visualization
+ - [Bug-fix] Fixed scrolling and boundaries issues
+
+v0.2.0-whoa-there:
  - [Feature] Added a comprehensive Stats Panel for enhanced data insights
  - [Feature] Introduced cell selection functionality for improved interactivity
- - [Bugfix] Enhanced scrolling performance and responsiveness
- - [Bugfix] Fixed issues with column hovering and selection for a smoother user experience
+ - [Bug-fix] Enhanced scrolling performance and responsiveness
+ - [Bug-fix] Fixed issues with column hovering and selection for a smoother user experience
 
-v0.1.0: first-fish
+v0.1.0-arthur:
  - Initial release
