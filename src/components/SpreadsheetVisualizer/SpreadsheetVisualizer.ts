@@ -148,11 +148,6 @@ export class SpreadsheetVisualizer {
     this.totalRows = 0;
     this.totalCols = 0;
 
-    // Get container dimensions
-    const containerRect = this.container?.getBoundingClientRect();
-    const containerWidth = containerRect?.width ?? options.maxWidth ?? DEFAULT_MAX_WIDTH;
-    const containerHeight = containerRect?.height ?? options.maxHeight ?? DEFAULT_MAX_HEIGHT;
-
     // Set default options
     this.options = {
       // Viewport options
@@ -160,8 +155,8 @@ export class SpreadsheetVisualizer {
       maxWidth: options.maxWidth ?? DEFAULT_MAX_WIDTH,
       minHeight: options.minHeight ?? DEFAULT_MIN_HEIGHT,
       minWidth: options.minWidth ?? DEFAULT_MIN_WIDTH,
-      height: options.height ?? containerWidth,
-      width: options.width ?? containerHeight,
+      height: options.height ?? this.container.clientHeight,
+      width: options.width ?? this.container.clientWidth,
 
       // Cell options
       cellHeight: options.cellHeight ?? DEFAULT_CELL_HEIGHT,
@@ -195,8 +190,8 @@ export class SpreadsheetVisualizer {
     };
 
     // Apply constraints
-    this.options.height = Math.min(Math.max(this.options.height, this.options.minHeight), this.options.maxHeight);
-    this.options.width = Math.min(Math.max(this.options.width, this.options.minWidth), this.options.maxWidth);
+    this.options.height = minMax(this.options.height, this.options.minHeight, this.options.maxHeight);
+    this.options.width = minMax(this.options.width, this.options.minWidth, this.options.maxWidth);
 
     // Initialize throttled mouse move handler (16ms = ~60fps)
     this.throttledMouseMove = throttle(this.handleMouseMove.bind(this), 16);
@@ -235,7 +230,7 @@ export class SpreadsheetVisualizer {
   }
 
   public getSelectedColumns(): Column[] {
-    return this.selectedCols.map(colIndex => this.columns[colIndex]).filter(col => col !== undefined);
+    return this.selectedCols.map((colIndex) => this.columns[colIndex]).filter((col) => col !== undefined);
   }
 
   private setupEventListeners() {
@@ -258,9 +253,21 @@ export class SpreadsheetVisualizer {
   }
 
   private async updateLayout() {
-    // Apply constraints
-    let width = Math.floor(minMax(this.container.clientWidth, this.options.minWidth, this.options.maxWidth));
-    const height = Math.floor(minMax(this.container.clientHeight, this.options.minHeight, this.options.maxHeight));
+    // Use explicit dimensions from options if available, otherwise fall back to container dimensions
+    let width: number;
+    let height: number;
+
+    if (this.options.width !== undefined) {
+      width = Math.floor(minMax(this.options.width, this.options.minWidth, this.options.maxWidth));
+    } else {
+      width = Math.floor(minMax(this.container.clientWidth, this.options.minWidth, this.options.maxWidth));
+    }
+
+    if (this.options.height !== undefined) {
+      height = Math.floor(minMax(this.options.height, this.options.minHeight, this.options.maxHeight));
+    } else {
+      height = Math.floor(minMax(this.container.clientHeight, this.options.minHeight, this.options.maxHeight));
+    }
 
     if (this.hasStatsPanel) {
       // Adjust canvas width to make room for stats panel
