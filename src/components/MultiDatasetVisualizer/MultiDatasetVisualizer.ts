@@ -26,6 +26,14 @@ export class MultiDatasetVisualizer {
     this.container.className = "multi-dataset-visualizer";
     this.options = options;
 
+    // Set explicit dimensions if provided
+    if (options.width) {
+      this.container.style.width = `${options.width}px`;
+    }
+    if (options.height) {
+      this.container.style.height = `${options.height}px`;
+    }
+
     // Create tabs container
     this.tabsContainer = document.createElement("div");
     this.tabsContainer.className = "multi-dataset-visualizer__tabs-container";
@@ -38,6 +46,9 @@ export class MultiDatasetVisualizer {
     this.container.appendChild(this.contentContainer);
     parent.appendChild(this.container);
 
+    // Force layout calculation
+    this.container.offsetHeight;
+
     // Create shared stats visualizer
     this.sharedStatsVisualizer = new ColumnStatsVisualizer(this.container, null, 350);
   }
@@ -48,8 +59,24 @@ export class MultiDatasetVisualizer {
     datasetContainer.className = "multi-dataset-visualizer__dataset-container";
     this.contentContainer.appendChild(datasetContainer);
 
+    // Force layout calculation to get accurate tab height
+    this.tabsContainer.offsetHeight;
+
+    // Calculate available dimensions for the spreadsheet
+    // Account for tabs container height and any padding/margins
+    const tabsHeight = this.tabsContainer.offsetHeight || 40; // Default fallback height for tabs
+    const availableHeight = this.options.height ? this.options.height - tabsHeight : undefined;
+    const availableWidth = this.options.width;
+
+    // Create options for the spreadsheet with adjusted dimensions
+    const spreadsheetOptions = {
+      ...this.options,
+      height: availableHeight,
+      width: availableWidth,
+    };
+
     // Create spreadsheet visualizer for this dataset with shared stats visualizer
-    const spreadsheetVisualizer = new SpreadsheetVisualizer(datasetContainer, dataProvider, this.options, this.sharedStatsVisualizer);
+    const spreadsheetVisualizer = new SpreadsheetVisualizer(datasetContainer, dataProvider, spreadsheetOptions, this.sharedStatsVisualizer);
 
     const tab: DatasetTab = {
       id,
