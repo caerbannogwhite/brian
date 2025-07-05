@@ -1,0 +1,156 @@
+.dataset-panel {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 100vh;
+  z-index: 1000;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+
+  &__panel {
+    width: 280px;
+    height: 100%;
+    background: #ffffff;
+    border-right: 1px solid #e1e5e9;
+    box-shadow: 2px 0 8px rgba(0, 0, 0, 0.1);
+    display: flex;
+    flex-direction: column;
+    transition: width 0.3s ease, transform 0.3s ease;
+    
+    &--minimized {
+      width: 48px;
+      
+      .dataset-panel__header {
+        padding: 12px 8px;
+        justify-content: center;
+      }
+      
+      .dataset-panel__title {
+        display: none;
+      }
+      
+      .dataset-panel__toggle {
+        margin: 0;
+      }
+      
+      .dataset-panel__content {
+        display: none;
+      }
+    }
+  }
+
+  &__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    background: #f8f9fa;
+    border-bottom: 1px solid #e1e5e9;
+    min-height: 60px;
+  }
+
+  &__title {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+    color: #2c3e50;
+  }
+
+  &__toggle {
+    background: none;
+    border: none;
+    font-size: 18px;
+    font-weight: bold;
+    color: #6c757d;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 4px;
+    transition: background-color 0.2s ease, color 0.2s ease;
+    
+    &:hover {
+      background-color: #e9ecef;
+      color: #495057;
+    }
+    
+    &:focus {
+      outline: none;
+      box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+    }
+  }
+
+  &__content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0;
+  }
+
+  &__list {
+    padding: 0;
+  }
+
+  &__item {
+    display: flex;
+    align-items: center;
+    padding: 12px 20px;
+    border-bottom: 1px solid #f1f3f4;
+    transition: background-color 0.2s ease;
+    
+    &:not(&--loaded) {
+      cursor: pointer;
+      
+      &:hover {
+        background-color: #f8f9fa;
+      }
+      
+      &:active {
+        background-color: #e9ecef;
+      }
+    }
+    
+    &--loaded {
+      background-color: #e8f5e8;
+      color: #155724;
+      
+      .dataset-panel__item-icon {
+        color: #28a745;
+      }
+    }
+  }
+
+  &__item-icon {
+    font-size: 18px;
+    margin-right: 12px;
+    min-width: 24px;
+    text-align: center;
+    color: #6c757d;
+  }
+
+  &__item-text {
+    flex: 1;
+    min-width: 0; // Allow text to wrap/truncate
+  }
+
+  &__item-name {
+    font-weight: 600;
+    font-size: 14px;
+    color: #2c3e50;
+    margin-bottom: 2px;
+  }
+
+  &__item-label {
+    font-size: 12px;
+    color: #6c757d;
+    line-height: 1.3;
+  }
+}
+
+// Add some spacing to the main content when panel is open
+.main-content {
+  margin-left: 280px;
+  transition: margin-left 0.3s ease;
+  
+  &--panel-minimized {
+    margin-left: 48px;
+  }
+} 
