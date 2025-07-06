@@ -112,7 +112,7 @@ export function handleScrollbarMouseDown(
   x: number,
   y: number,
   options: ScrollbarOptions,
-  state: ScrollbarState
+  _: ScrollbarState
 ): { isDraggingVertical: boolean; isDraggingHorizontal: boolean } {
   if (isPointInVerticalScrollbar(x, y, options)) {
     return { isDraggingVertical: true, isDraggingHorizontal: false };

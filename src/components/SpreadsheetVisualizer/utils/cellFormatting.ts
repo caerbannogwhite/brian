@@ -57,7 +57,7 @@ export function parseFormat(format: string | undefined, type: "number" | "date" 
 
 export function getFormatOptions(column: Column, type: "number" | "date" | "datetime", options: SpreadsheetOptions): any {
   if (column.format) {
-    const parsedFormat = parseFormat(column.format, type);
+    const parsedFormat = parseFormat(column.format.toString(), type);
     if (parsedFormat) return parsedFormat;
   }
 
@@ -82,8 +82,7 @@ export function formatCellValue(value: any, column: Column, options: Spreadsheet
   }
 
   switch (column.dataType) {
-    case "integer":
-    case "decimal":
+    case "number":
       const numValue = Number(value);
       if (!isNaN(numValue)) {
         const formatOptions = getFormatOptions(column, "number", options);

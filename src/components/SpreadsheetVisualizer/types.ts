@@ -63,9 +63,16 @@ export interface SpreadsheetOptions {
   scrollbarHoverColor?: string;
 
   // Format options
+  booleanStyle?: CellStyle;
+  numericStyle?: CellStyle;
+  stringStyle?: CellStyle;
+  dateStyle?: CellStyle;
+  datetimeStyle?: CellStyle;
+  nullStyle?: CellStyle;
+
+  numberFormat?: Intl.NumberFormatOptions;
   dateFormat?: string;
   datetimeFormat?: string;
-  numberFormat?: Intl.NumberFormatOptions;
 }
 
 export interface DataProvider {

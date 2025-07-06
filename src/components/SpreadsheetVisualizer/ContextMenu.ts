@@ -128,7 +128,7 @@ export class ContextMenu {
     // Get column headers for the selected range
     const headers = [];
     for (let col = Math.min(startCol, endCol); col <= Math.max(startCol, endCol); col++) {
-      headers.push(columns[col].header);
+      headers.push(columns[col].name);
     }
 
     // Create CSV content with headers
@@ -180,7 +180,7 @@ export class ContextMenu {
     // Get column headers for the selected range
     const headers = [];
     for (let col = Math.min(startCol, endCol); col <= Math.max(startCol, endCol); col++) {
-      headers.push(columns[col].header);
+      headers.push(columns[col].name);
     }
 
     // Create HTML table
@@ -223,7 +223,7 @@ export class ContextMenu {
     // Get column headers for the selected range
     const headers = [];
     for (let col = Math.min(startCol, endCol); col <= Math.max(startCol, endCol); col++) {
-      headers.push(columns[col].header);
+      headers.push(columns[col].name);
     }
 
     // Create markdown table

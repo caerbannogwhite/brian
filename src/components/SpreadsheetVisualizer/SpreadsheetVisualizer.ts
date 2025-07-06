@@ -25,6 +25,12 @@ import {
   DEFAULT_DATETIME_FORMAT,
   DEFAULT_NUMBER_FORMAT,
   DEFAULT_BORDER_WIDTH,
+  DEFAULT_BOOLEAN_STYLE,
+  DEFAULT_NUMERIC_STYLE,
+  DEFAULT_STRING_STYLE,
+  DEFAULT_DATE_STYLE,
+  DEFAULT_DATETIME_STYLE,
+  DEFAULT_NULL_STYLE,
 } from "./defaults";
 import { Column, SpreadsheetOptions, DataProvider } from "./types";
 import { minMax } from "./utils/drawing";
@@ -93,9 +99,7 @@ export class SpreadsheetVisualizer {
   private totalHeight = 0;
   private totalScrollY = 0;
   private totalScrollX = 0;
-  private visibleRows = 0;
-  private visibleCols = 0;
-  private dataCache: Map<string, any[][]> = new Map();
+  // private dataCache: Map<string, any[][]> = new Map();
 
   // Stats panel
   private statsPanelWidth = 350; // Width of the stats panel
@@ -184,6 +188,13 @@ export class SpreadsheetVisualizer {
       scrollbarHoverColor: options.scrollbarHoverColor ?? DEFAULT_SCROLLBAR_HOVER_COLOR,
 
       // Format options
+      booleanStyle: options.booleanStyle ?? DEFAULT_BOOLEAN_STYLE,
+      numericStyle: options.numericStyle ?? DEFAULT_NUMERIC_STYLE,
+      stringStyle: options.stringStyle ?? DEFAULT_STRING_STYLE,
+      dateStyle: options.dateStyle ?? DEFAULT_DATE_STYLE,
+      datetimeStyle: options.datetimeStyle ?? DEFAULT_DATETIME_STYLE,
+      nullStyle: options.nullStyle ?? DEFAULT_NULL_STYLE,
+
       dateFormat: options.dateFormat ?? DEFAULT_DATE_FORMAT,
       datetimeFormat: options.datetimeFormat ?? DEFAULT_DATETIME_FORMAT,
       numberFormat: options.numberFormat ?? DEFAULT_NUMBER_FORMAT,
@@ -343,9 +354,6 @@ export class SpreadsheetVisualizer {
     // }
 
     this.totalScrollX = this.totalWidth - this.canvas.width + (hasScrollbar ? this.options.scrollbarWidth : 0);
-
-    // Update visible columns
-    this.visibleCols = Math.ceil(availableWidth / (this.totalWidth / this.columns.length));
   }
 
   private calculateRowHeight() {
@@ -711,7 +719,7 @@ export class SpreadsheetVisualizer {
     return x >= this.options.rowHeaderWidth && y < this.options.cellHeight;
   }
 
-  private isMouseOverRowIndex(x: number, y: number): boolean {
+  private isMouseOverRowIndex(x: number, _: number): boolean {
     return x <= this.options.rowHeaderWidth;
   }
 

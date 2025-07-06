@@ -32,6 +32,36 @@ const DEFAULT_SCROLLBAR_COLOR = "#e0e0e0";
 const DEFAULT_SCROLLBAR_THUMB_COLOR = "#b0b0b0";
 const DEFAULT_SCROLLBAR_HOVER_COLOR = "#909090";
 
+const DEFAULT_BOOLEAN_STYLE = {
+  backgroundColor: "#f0f0f0",
+  textColor: "#333",
+};
+
+const DEFAULT_NUMERIC_STYLE = {
+  backgroundColor: "#f0f0f0",
+  textColor: "#333",
+};
+
+const DEFAULT_STRING_STYLE = {
+  backgroundColor: "#f0f0f0",
+  textColor: "#333",
+};
+
+const DEFAULT_DATE_STYLE = {
+  backgroundColor: "#f0f0f0",
+  textColor: "#333",
+};
+
+const DEFAULT_DATETIME_STYLE = {
+  backgroundColor: "#f0f0f0",
+  textColor: "#333",
+};
+
+const DEFAULT_NULL_STYLE = {
+  backgroundColor: "#f0f0f0",
+  textColor: "#333",
+};
+
 const DEFAULT_DATE_FORMAT = "yyyy-MM-dd";
 const DEFAULT_DATETIME_FORMAT = "yyyy-MM-dd HH:mm:ss";
 const DEFAULT_NUMBER_FORMAT = { minimumFractionDigits: 2, maximumFractionDigits: 2 };
@@ -67,4 +97,10 @@ export {
   DEFAULT_DATE_FORMAT,
   DEFAULT_DATETIME_FORMAT,
   DEFAULT_NUMBER_FORMAT,
+  DEFAULT_BOOLEAN_STYLE,
+  DEFAULT_NUMERIC_STYLE,
+  DEFAULT_STRING_STYLE,
+  DEFAULT_DATE_STYLE,
+  DEFAULT_DATETIME_STYLE,
+  DEFAULT_NULL_STYLE,
 };
