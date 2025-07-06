@@ -14,7 +14,8 @@ A simple and powerful spreadsheet data viewer for CDISC clinical trial data, bui
 
 ## Demo
 
-![Demo](./media/brian-demo.mp4)
+![Demo](./media/brian-demo-base.gif)
+![Demo](./media/brian-demo-export.gif)
 
 ## Installation
 
