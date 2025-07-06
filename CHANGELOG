@@ -1,4 +1,4 @@
-v0.3.0:
+v0.3.0-guard:
  - [Feature] Multi-dataset support: visualize multiple datasets in different tabs
  - [Feature] Export selection menu: CSV, TSV, HTML and Markdown
  - [Feature] DataProvider interface updated to include metadata
