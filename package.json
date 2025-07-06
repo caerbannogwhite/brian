@@ -1,13 +1,45 @@
 {
   "name": "brian",
-  "private": true,
-  "version": "0.1.0",
+  "version": "0.3.0",
+  "description": "A simple spreadsheet data viewer for CDISC clinical trial data in TypeScript",
+  "main": "dist/index.js",
+  "module": "dist/index.es.js",
+  "types": "dist/index.d.ts",
   "type": "module",
+  "exports": {
+    ".": {
+      "import": "./dist/index.es.js",
+      "require": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./style.css": "./dist/style.css"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "CHANGELOG"
+  ],
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
+    "build:lib": "vite build --config vite.config.ts",
     "preview": "vite preview"
   },
+  "keywords": [
+    "spreadsheet",
+    "data-viewer",
+    "cdisc",
+    "clinical-trial-data",
+    "typescript",
+    "visualization"
+  ],
+  "author": "Massimo Meneghello",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/caerbannogwhite/brian"
+  },
+  "homepage": "https://github.com/caerbannogwhite/brian",
   "devDependencies": {
     "@types/node": "^20.11.19",
     "sass": "^1.89.2",
