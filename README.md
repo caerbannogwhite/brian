@@ -12,6 +12,10 @@ A simple and powerful spreadsheet data viewer for CDISC clinical trial data, bui
 - ⚡ **High performance** with virtual scrolling
 - 🎯 **Easy integration** with existing applications
 
+## Demo
+
+![Demo](./media/brian-demo.mp4)
+
 ## Installation
 
 ### NPM
