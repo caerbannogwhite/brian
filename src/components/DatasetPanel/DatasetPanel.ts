@@ -108,25 +108,6 @@ export class DatasetPanel {
     });
   }
 
-  private toggleMinimize(): void {
-    this.isMinimized = !this.isMinimized;
-
-    if (this.isMinimized) {
-      this.panelElement.classList.add("dataset-panel__panel--minimized");
-      this.toggleButton.innerHTML = "+";
-      this.toggleButton.title = "Expand panel";
-    } else {
-      this.panelElement.classList.remove("dataset-panel__panel--minimized");
-      this.toggleButton.innerHTML = "−";
-      this.toggleButton.title = "Minimize panel";
-    }
-
-    // Call the callback if it exists
-    if (this.onToggleCallback) {
-      this.onToggleCallback(this.isMinimized);
-    }
-  }
-
   private renderDatasetList(): void {
     const listElement = this.contentElement.querySelector(".dataset-panel__list") as HTMLElement;
     listElement.innerHTML = "";
@@ -187,5 +168,24 @@ export class DatasetPanel {
 
   public getIsMinimized(): boolean {
     return this.isMinimized;
+  }
+
+  public toggleMinimize(): void {
+    this.isMinimized = !this.isMinimized;
+
+    if (this.isMinimized) {
+      this.panelElement.classList.add("dataset-panel__panel--minimized");
+      this.toggleButton.innerHTML = "+";
+      this.toggleButton.title = "Expand panel";
+    } else {
+      this.panelElement.classList.remove("dataset-panel__panel--minimized");
+      this.toggleButton.innerHTML = "−";
+      this.toggleButton.title = "Minimize panel";
+    }
+
+    // Call the callback if it exists
+    if (this.onToggleCallback) {
+      this.onToggleCallback(this.isMinimized);
+    }
   }
 }

@@ -4,7 +4,6 @@ import { StatusBar } from "../StatusBar";
 import { CommandPalette } from "../CommandPalette";
 import { SpreadsheetOptions } from "../SpreadsheetVisualizer/types";
 import { CdiscDataset } from "../../data/types";
-import { CdiscDataProvider } from "../../data/providers/CdiscDataProvider";
 
 export interface BrianAppOptions {
   spreadsheetOptions?: SpreadsheetOptions;
@@ -179,14 +178,6 @@ export class BrianApp {
 
     // View commands
     this.commandPalette.registerCommand({
-      id: "view.toggleColumnStats",
-      title: "Toggle Column Statistics",
-      description: "Show or hide column statistics panel",
-      category: "View",
-      execute: () => this.toggleColumnStats(),
-    });
-
-    this.commandPalette.registerCommand({
       id: "view.toggleDatasetPanel",
       title: "Toggle Dataset Panel",
       description: "Show or hide the dataset panel",
@@ -200,15 +191,6 @@ export class BrianApp {
       description: "Switch between light and dark themes",
       category: "View",
       execute: () => this.toggleTheme(),
-    });
-
-    this.commandPalette.registerCommand({
-      id: "view.toggleFullscreen",
-      title: "Toggle Fullscreen",
-      description: "Enter or exit fullscreen mode",
-      category: "View",
-      keybinding: "F11",
-      execute: () => this.toggleFullscreen(),
     });
 
     // Dataset commands
@@ -245,53 +227,18 @@ export class BrianApp {
       case "workbench.action.showCommands":
         this.commandPalette?.show();
         break;
-      case "view.toggleColumnStats":
-        this.toggleColumnStats();
-        break;
+
       case "dataset.export":
         this.exportCurrentDataset();
         break;
+
       default:
         console.warn("Unknown command:", command);
     }
   }
 
-  // Public API methods
-  public async addDataset(id: string, name: string, dataset: CdiscDataset): Promise<void> {
-    const dataProvider = new CdiscDataProvider(dataset);
-    await this.multiDatasetVisualizer.addDataset(id, name, dataProvider);
-
-    if (this.datasetPanel) {
-      this.datasetPanel.addDataset(id, id, name, dataset);
-    }
-
-    this.updateStatusBarDatasetInfo();
-  }
-
-  public setTheme(theme: "light" | "dark"): void {
-    this.container.classList.remove(`brian-app--${this.theme}`);
-    document.body.classList.remove(`theme-${this.theme}`);
-
-    this.theme = theme;
-    this.container.classList.add(`brian-app--${this.theme}`);
-    document.body.classList.add(`theme-${this.theme}`);
-  }
-
-  public showMessage(message: string, type: "info" | "warning" | "error" = "info"): void {
-    this.statusBar?.showMessage(message, type);
-  }
-
-  // Command implementations
-  private toggleColumnStats(): void {
-    // This would require extending the visualizer to have a toggleable stats panel
-    this.showMessage("Column stats toggle not implemented yet", "info");
-  }
-
   private toggleDatasetPanel(): void {
-    if (this.datasetPanel) {
-      // This would require adding a toggle method to DatasetPanel
-      this.showMessage("Dataset panel toggle not implemented yet", "info");
-    }
+    this.datasetPanel.toggleMinimize();
   }
 
   private toggleTheme(): void {
@@ -326,12 +273,12 @@ export class BrianApp {
   private showApplicationInfo(): void {
     const datasetIds = this.multiDatasetVisualizer.getDatasetIds();
     const info = `
-Brian Application Info:
-- Active datasets: ${datasetIds.length}
-- Theme: ${this.theme}
-- Dataset panel: ${this.options.showDatasetPanel ? "visible" : "hidden"}
-- Status bar: ${this.options.statusBarVisible ? "visible" : "hidden"}
-- Command palette: ${this.options.commandPaletteEnabled ? "enabled" : "disabled"}
+    Brian Application Info:
+    - Active datasets: ${datasetIds.length}
+    - Theme: ${this.theme}
+    - Dataset panel: ${this.options.showDatasetPanel ? "visible" : "hidden"}
+    - Status bar: ${this.options.statusBarVisible ? "visible" : "hidden"}
+    - Command palette: ${this.options.commandPaletteEnabled ? "enabled" : "disabled"}
     `.trim();
 
     console.log(info);
@@ -344,6 +291,25 @@ Brian Application Info:
       // TODO: Get actual dataset info from the visualizer
       this.statusBar.updateDatasetInfo(activeId, 0, 0);
     }
+  }
+
+  // Public API methods
+  public async addDataset(id: string, name: string, dataset: CdiscDataset): Promise<void> {
+    this.datasetPanel.addDataset(id, id, name, dataset);
+    this.updateStatusBarDatasetInfo();
+  }
+
+  public setTheme(theme: "light" | "dark"): void {
+    this.container.classList.remove(`brian-app--${this.theme}`);
+    document.body.classList.remove(`theme-${this.theme}`);
+
+    this.theme = theme;
+    this.container.classList.add(`brian-app--${this.theme}`);
+    document.body.classList.add(`theme-${this.theme}`);
+  }
+
+  public showMessage(message: string, type: "info" | "warning" | "error" = "info"): void {
+    this.statusBar?.showMessage(message, type);
   }
 
   public destroy(): void {
