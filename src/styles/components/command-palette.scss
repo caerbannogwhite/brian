@@ -5,15 +5,12 @@
   left: 0;
   width: 100%;
   height: 100%;
-  background-color: rgba(0, 0, 0, 0.75);
+  background-color: rgba(0, 0, 0, 0.6);
   z-index: 9998;
-  
-  // No backdrop-filter to ensure content stays crisp
-  // Using a slightly darker overlay instead for better contrast
   
   // Light theme overlay
   body.theme-light & {
-    background-color: rgba(0, 0, 0, 0.3) !important;
+    background-color: rgba(0, 0, 0, 0.2) !important;
   }
 }
 
@@ -25,10 +22,10 @@
   width: 600px;
   max-width: 90vw;
   max-height: 60vh;
-  background-color: #2d2d30;
-  border: 1px solid #5a5a5a;
+  background-color: #3c3c3c;
+  border: 1px solid #666666;
   border-radius: 6px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
   z-index: 9999;
   overflow: hidden;
   animation: commandPaletteSlideIn 0.2s ease-out;
@@ -36,8 +33,8 @@
   // Light theme - higher specificity and brighter colors
   body.theme-light & {
     background-color: #ffffff !important;
-    border-color: #d0d0d0 !important;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2) !important;
+    border-color: #e5e5e5 !important;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15) !important;
   }
 
   &__input {
@@ -47,23 +44,23 @@
     border: none;
     outline: none;
     font-size: 14px;
-    color: #f0f0f0;
+    color: #ffffff;
     padding: 0 16px;
-    border-bottom: 1px solid #5a5a5a;
+    border-bottom: 1px solid #666666;
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 
     &::placeholder {
-      color: #b0b0b0;
+      color: #cccccc;
     }
 
     // Light theme
     body.theme-light & {
-      color: #000000 !important;
-      border-bottom-color: #d0d0d0 !important;
-      background-color: #ffffff !important;
+      color: #2c3e50 !important;
+      border-bottom-color: #e1e5e9 !important;
+      background-color: #f8f9fa !important;
 
       &::placeholder {
-        color: #666666 !important;
+        color: #6c757d !important;
       }
     }
   }
@@ -83,20 +80,20 @@
     }
 
     &::-webkit-scrollbar-thumb {
-      background-color: #606060;
+      background-color: #777777;
       border-radius: 4px;
       
       &:hover {
-        background-color: #707070;
+        background-color: #888888;
       }
     }
 
     // Light theme scrollbar
     body.theme-light &::-webkit-scrollbar-thumb {
-      background-color: #d1d1d1;
+      background-color: #e1e5e9;
       
       &:hover {
-        background-color: #bdbdbd;
+        background-color: #d6dade;
       }
     }
   }
@@ -112,21 +109,21 @@
     justify-content: center;
 
     &:hover {
-      background-color: #37373d;
+      background-color: #4a4a4a;
     }
 
     &--selected {
-      background-color: #0e639c;
+      background-color: #0078d4;
       
       &:hover {
-        background-color: #1177bb;
+        background-color: #1084e4;
       }
     }
 
     // Light theme
     body.theme-light & {
       &:hover {
-        background-color: #f0f0f0 !important;
+        background-color: #f8f9fa !important;
       }
 
       &--selected {
@@ -141,14 +138,14 @@
 
     &-title {
       font-size: 13px;
-      font-weight: 400;
-      color: #f0f0f0;
+      font-weight: 500;
+      color: #ffffff;
       margin-bottom: 2px;
       
       // Light theme
       body.theme-light & {
-        color: #000000 !important;
-        font-weight: 500 !important;
+        color: #2c3e50 !important;
+        font-weight: 600 !important;
       }
       
       // Selected state
@@ -162,16 +159,16 @@
       align-items: center;
       gap: 12px;
       font-size: 11px;
-      color: #c0c0c0;
+      color: #dddddd;
       
       // Light theme
       body.theme-light & {
-        color: #333333 !important;
+        color: #6c757d !important;
       }
       
       // Selected state
       .command-palette__item--selected & {
-        color: rgba(255, 255, 255, 0.8);
+        color: rgba(255, 255, 255, 0.9);
       }
     }
 
@@ -183,24 +180,26 @@
     }
 
     &-keybinding {
-      background-color: #5a5a5a;
-      color: #f0f0f0;
+      background-color: #666666;
+      color: #ffffff;
       padding: 2px 6px;
       border-radius: 3px;
       font-size: 10px;
       font-family: 'Consolas', 'Monaco', monospace;
+      border: 1px solid #777777;
       
       // Light theme
       body.theme-light & {
-        background-color: #e8e8e8 !important;
-        color: #000000 !important;
-        border: 1px solid #d0d0d0 !important;
+        background-color: #f1f3f4 !important;
+        color: #495057 !important;
+        border: 1px solid #e1e5e9 !important;
       }
       
       // Selected state
       .command-palette__item--selected & {
-        background-color: rgba(255, 255, 255, 0.2);
+        background-color: rgba(255, 255, 255, 0.25);
         color: #ffffff;
+        border-color: rgba(255, 255, 255, 0.3);
       }
     }
   }
@@ -208,13 +207,13 @@
   &__no-results {
     padding: 16px;
     text-align: center;
-    color: #c0c0c0;
+    color: #dddddd;
     font-size: 12px;
     font-style: italic;
     
     // Light theme
     body.theme-light & {
-      color: #333333 !important;
+      color: #6c757d !important;
     }
   }
 }

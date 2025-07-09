@@ -161,7 +161,7 @@ export class CommandPalette {
       return;
     }
 
-    this.filteredCommands.forEach((command, index) => {
+    this.filteredCommands.forEach((command) => {
       const item = document.createElement("div");
       item.className = "command-palette__item";
       item.addEventListener("click", () => this.executeCommand(command));
