@@ -4,6 +4,9 @@
 @use 'components/column-stats-visualizer';
 @use 'components/context-menu';
 @use 'components/dataset-panel';
+@use 'components/status-bar';
+@use 'components/command-palette';
+@use 'components/brian-app';
 
 // Global styles
 * {

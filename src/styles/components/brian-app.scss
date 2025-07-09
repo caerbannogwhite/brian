@@ -1,0 +1,166 @@
+// BrianApp - Main application layout with VS Code-like styling
+.brian-app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  width: 100vw;
+  background-color: #1e1e1e;
+  color: #cccccc;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  overflow: hidden;
+
+  // Light theme
+  body.theme-light & {
+    background-color: #ffffff;
+    color: #333333;
+  }
+
+  // Dark theme (default)
+  body.theme-dark & {
+    background-color: #1e1e1e;
+    color: #cccccc;
+  }
+
+  &__main {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+    position: relative;
+  }
+
+  &__dataset-panel {
+    display: flex;
+    flex-direction: column;
+    width: 280px;
+    min-width: 280px;
+    background-color: #252526;
+    border-right: 1px solid #3c3c3c;
+    overflow: hidden;
+    transition: width 0.3s ease;
+
+    // Light theme
+    body.theme-light & {
+      background-color: #f3f3f3;
+      border-right-color: #e5e5e5;
+    }
+
+    // Minimized state
+    .brian-app--panel-minimized & {
+      width: 48px;
+      min-width: 48px;
+    }
+  }
+
+  &__spreadsheet {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background-color: #1e1e1e;
+    position: relative;
+
+    // Light theme
+    body.theme-light & {
+      background-color: #ffffff;
+    }
+  }
+
+
+}
+
+// Global theme body classes
+body.theme-light {
+  background-color: #ffffff;
+  color: #333333;
+}
+
+body.theme-dark {
+  background-color: #1e1e1e;
+  color: #cccccc;
+}
+
+// Responsive design
+@media (max-width: 768px) {
+  .brian-app {
+    &__dataset-panel {
+      width: 100%;
+      max-width: 280px;
+      position: absolute;
+      top: 0;
+      left: 0;
+      bottom: 0;
+      z-index: 1000;
+      transform: translateX(-100%);
+      transition: transform 0.3s ease;
+
+      &.brian-app__dataset-panel--visible {
+        transform: translateX(0);
+      }
+
+      // When minimized on mobile, hide completely
+      .brian-app--panel-minimized & {
+        transform: translateX(-100%);
+      }
+    }
+
+    &__spreadsheet {
+      width: 100%;
+    }
+  }
+}
+
+@media (max-width: 480px) {
+  .brian-app {
+    &__dataset-panel {
+      width: 100%;
+      max-width: none;
+    }
+  }
+}
+
+// Focus management
+.brian-app {
+  &:focus-within {
+    .status-bar {
+      border-top-color: #007acc;
+    }
+  }
+}
+
+// High contrast mode
+@media (prefers-contrast: high) {
+  .brian-app {
+    &__dataset-panel {
+      border-right-width: 2px;
+    }
+
+    &--light {
+      .status-bar {
+        border-top-color: #000000;
+      }
+
+      .brian-app__dataset-panel {
+        border-right-color: #000000;
+      }
+    }
+
+    &--dark {
+      .status-bar {
+        border-top-color: #ffffff;
+      }
+
+      .brian-app__dataset-panel {
+        border-right-color: #ffffff;
+      }
+    }
+  }
+}
+
+// Reduced motion
+@media (prefers-reduced-motion: reduce) {
+  .brian-app {
+    &__dataset-panel {
+      transition: none;
+    }
+  }
+} 

@@ -1,0 +1,172 @@
+// Status Bar - VS Code inspired styling
+.status-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 22px;
+  background-color: #007acc;
+  color: #ffffff;
+  font-size: 12px;
+  line-height: 22px;
+  padding: 0 8px;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  border-top: 1px solid #005a9e;
+  user-select: none;
+
+  // Light theme
+  body.theme-light & {
+    background-color: #f3f3f3;
+    color: #333333;
+    border-top-color: #e5e5e5;
+  }
+
+  // Dark theme (keep default for dark)
+  body.theme-dark & {
+    background-color: #007acc;
+    color: #ffffff;
+    border-top-color: #005a9e;
+  }
+
+  &__section {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-shrink: 0;
+
+    &--left {
+      flex: 1;
+      justify-content: flex-start;
+    }
+
+    &--right {
+      justify-content: flex-end;
+    }
+  }
+
+  &__item {
+    display: flex;
+    align-items: center;
+    height: 100%;
+    padding: 0 8px;
+    font-size: 11px;
+    white-space: nowrap;
+    background-color: transparent;
+    border: none;
+    cursor: default;
+    transition: all 0.2s ease;
+    border-radius: 2px;
+
+    &--clickable {
+      cursor: pointer;
+      
+      &:hover {
+        background-color: rgba(255, 255, 255, 0.1);
+      }
+
+      &:active {
+        background-color: rgba(255, 255, 255, 0.2);
+      }
+    }
+
+    // Color variants
+    &--error {
+      color: #f14c4c;
+    }
+
+    &--warning {
+      color: #ffcc02;
+    }
+
+    &--info {
+      color: #75beff;
+    }
+
+    &--success {
+      color: #89d185;
+    }
+
+    // Special styling for specific items
+    &[data-id="dataset-info"] {
+      font-weight: 500;
+    }
+
+    &[data-id="selection-info"] {
+      color: rgba(255, 255, 255, 0.8);
+    }
+
+    &[data-id="command-palette"] {
+      background-color: rgba(255, 255, 255, 0.1);
+      border-radius: 3px;
+      font-size: 10px;
+      padding: 2px 6px;
+      margin-left: 8px;
+    }
+  }
+}
+
+// Responsive adjustments
+@media (max-width: 768px) {
+  .status-bar {
+    padding: 0 4px;
+    
+    &__section {
+      gap: 8px;
+    }
+    
+    &__item {
+      padding: 0 4px;
+      font-size: 10px;
+      
+      // Hide less important items on mobile
+      &[data-id="cell-value"],
+      &[data-id="command-palette"] {
+        display: none;
+      }
+    }
+  }
+}
+
+// Animation for temporary messages
+.status-bar__item[data-id="temp-message"] {
+  animation: statusBarMessageSlideIn 0.3s ease-out;
+}
+
+@keyframes statusBarMessageSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+// Theme-specific adjustments
+body.theme-dark {
+  .status-bar__item {
+    &--clickable:hover {
+      background-color: rgba(255, 255, 255, 0.1);
+    }
+    
+    &--clickable:active {
+      background-color: rgba(255, 255, 255, 0.2);
+    }
+  }
+}
+
+body.theme-light {
+  .status-bar__item {
+    &--clickable:hover {
+      background-color: rgba(0, 0, 0, 0.1);
+    }
+    
+    &--clickable:active {
+      background-color: rgba(0, 0, 0, 0.2);
+    }
+  }
+} 
