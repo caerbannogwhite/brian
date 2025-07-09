@@ -154,6 +154,11 @@ export class BrianApp {
     const contentWidth = windowWidth - panelWidth;
     this.spreadsheetContainer.style.width = `${contentWidth}px`;
     this.spreadsheetContainer.style.height = `${windowHeight - statusBarHeight}px`;
+
+    // Trigger resize on the multi-dataset visualizer to update the active spreadsheet
+    if (this.multiDatasetVisualizer) {
+      this.multiDatasetVisualizer.resize().catch(console.error);
+    }
   }
 
   private setupDatasetListeners(): void {

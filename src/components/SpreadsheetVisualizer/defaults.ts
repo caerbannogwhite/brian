@@ -1,3 +1,5 @@
+import { getThemeColors } from './utils/theme';
+
 const DEFAULT_CONTAINER_WIDTH = 1200;
 const DEFAULT_CONTAINER_HEIGHT = 800;
 
@@ -16,51 +18,100 @@ const DEFAULT_CELL_PADDING = 8;
 const DEFAULT_ROW_HEADER_WIDTH = 60;
 
 const DEFAULT_BORDER_WIDTH = 1;
-const DEFAULT_FONT_FAMILY = "Consolas, monospace";
-const DEFAULT_FONT_SIZE = 14;
-const DEFAULT_HEADER_FONT_SIZE = 14;
-const DEFAULT_HEADER_BACKGROUND_COLOR = "#f0f0f0";
-const DEFAULT_HEADER_TEXT_COLOR = "#333";
-const DEFAULT_CELL_BACKGROUND_COLOR = "#fff";
-const DEFAULT_CELL_TEXT_COLOR = "#000";
-const DEFAULT_BORDER_COLOR = "#ddd";
-const DEFAULT_SELECTION_COLOR = "rgba(0, 120, 215, 0.2)";
-const DEFAULT_HOVER_COLOR = "rgba(0, 120, 215, 0.1)";
+const DEFAULT_FONT_FAMILY = "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif";
+const DEFAULT_FONT_SIZE = 13;
+const DEFAULT_HEADER_FONT_SIZE = 13;
+
+// Get theme-aware colors
+function getDefaultColors() {
+  return getThemeColors();
+}
+
+// Export functions that return theme-aware defaults
+export function getDefaultHeaderBackgroundColor(): string {
+  return getDefaultColors().headerBackgroundColor;
+}
+
+export function getDefaultHeaderTextColor(): string {
+  return getDefaultColors().headerTextColor;
+}
+
+export function getDefaultCellBackgroundColor(): string {
+  return getDefaultColors().cellBackgroundColor;
+}
+
+export function getDefaultCellTextColor(): string {
+  return getDefaultColors().cellTextColor;
+}
+
+export function getDefaultBorderColor(): string {
+  return getDefaultColors().borderColor;
+}
+
+export function getDefaultSelectionColor(): string {
+  return getDefaultColors().selectionColor;
+}
+
+export function getDefaultHoverColor(): string {
+  return getDefaultColors().hoverColor;
+}
+
+export function getDefaultScrollbarColor(): string {
+  return getDefaultColors().scrollbarColor;
+}
+
+export function getDefaultScrollbarThumbColor(): string {
+  return getDefaultColors().scrollbarThumbColor;
+}
+
+export function getDefaultScrollbarHoverColor(): string {
+  return getDefaultColors().scrollbarHoverColor;
+}
+
+export function getDefaultBooleanStyle() {
+  return getDefaultColors().booleanStyle;
+}
+
+export function getDefaultNumericStyle() {
+  return getDefaultColors().numericStyle;
+}
+
+export function getDefaultStringStyle() {
+  return getDefaultColors().stringStyle;
+}
+
+export function getDefaultDateStyle() {
+  return getDefaultColors().dateStyle;
+}
+
+export function getDefaultDatetimeStyle() {
+  return getDefaultColors().datetimeStyle;
+}
+
+export function getDefaultNullStyle() {
+  return getDefaultColors().nullStyle;
+}
+
+// Legacy constants for backward compatibility (now theme-aware)
+const DEFAULT_HEADER_BACKGROUND_COLOR = getDefaultHeaderBackgroundColor();
+const DEFAULT_HEADER_TEXT_COLOR = getDefaultHeaderTextColor();
+const DEFAULT_CELL_BACKGROUND_COLOR = getDefaultCellBackgroundColor();
+const DEFAULT_CELL_TEXT_COLOR = getDefaultCellTextColor();
+const DEFAULT_BORDER_COLOR = getDefaultBorderColor();
+const DEFAULT_SELECTION_COLOR = getDefaultSelectionColor();
+const DEFAULT_HOVER_COLOR = getDefaultHoverColor();
 
 const DEFAULT_SCROLLBAR_WIDTH = 12;
-const DEFAULT_SCROLLBAR_COLOR = "#e0e0e0";
-const DEFAULT_SCROLLBAR_THUMB_COLOR = "#b0b0b0";
-const DEFAULT_SCROLLBAR_HOVER_COLOR = "#909090";
+const DEFAULT_SCROLLBAR_COLOR = getDefaultScrollbarColor();
+const DEFAULT_SCROLLBAR_THUMB_COLOR = getDefaultScrollbarThumbColor();
+const DEFAULT_SCROLLBAR_HOVER_COLOR = getDefaultScrollbarHoverColor();
 
-const DEFAULT_BOOLEAN_STYLE = {
-  backgroundColor: "#f0f0f0",
-  textColor: "#333",
-};
-
-const DEFAULT_NUMERIC_STYLE = {
-  backgroundColor: "#f0f0f0",
-  textColor: "#333",
-};
-
-const DEFAULT_STRING_STYLE = {
-  backgroundColor: "#f0f0f0",
-  textColor: "#333",
-};
-
-const DEFAULT_DATE_STYLE = {
-  backgroundColor: "#f0f0f0",
-  textColor: "#333",
-};
-
-const DEFAULT_DATETIME_STYLE = {
-  backgroundColor: "#f0f0f0",
-  textColor: "#333",
-};
-
-const DEFAULT_NULL_STYLE = {
-  backgroundColor: "#f0f0f0",
-  textColor: "#333",
-};
+const DEFAULT_BOOLEAN_STYLE = getDefaultBooleanStyle();
+const DEFAULT_NUMERIC_STYLE = getDefaultNumericStyle();
+const DEFAULT_STRING_STYLE = getDefaultStringStyle();
+const DEFAULT_DATE_STYLE = getDefaultDateStyle();
+const DEFAULT_DATETIME_STYLE = getDefaultDatetimeStyle();
+const DEFAULT_NULL_STYLE = getDefaultNullStyle();
 
 const DEFAULT_DATE_FORMAT = "yyyy-MM-dd";
 const DEFAULT_DATETIME_FORMAT = "yyyy-MM-dd HH:mm:ss";

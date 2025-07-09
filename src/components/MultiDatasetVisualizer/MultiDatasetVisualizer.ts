@@ -51,6 +51,9 @@ export class MultiDatasetVisualizer {
 
     // Create shared stats visualizer
     this.sharedStatsVisualizer = new ColumnStatsVisualizer(this.container, null, 350);
+
+    // Setup resize handling
+    this.setupResizeHandling();
   }
 
   public async addDataset(id: string, name: string, dataProvider: DataProvider): Promise<void> {
@@ -59,20 +62,29 @@ export class MultiDatasetVisualizer {
     datasetContainer.className = "multi-dataset-visualizer__dataset-container";
     this.contentContainer.appendChild(datasetContainer);
 
-    // Force layout calculation to get accurate tab height
+    // Force layout calculation to get accurate dimensions
+    this.container.offsetHeight;
     this.tabsContainer.offsetHeight;
+    this.contentContainer.offsetHeight;
 
-    // Calculate available dimensions for the spreadsheet
-    // Account for tabs container height and any padding/margins
-    const tabsHeight = this.tabsContainer.offsetHeight || 40; // Default fallback height for tabs
-    const availableHeight = this.options.height ? this.options.height - tabsHeight : undefined;
-    const availableWidth = this.options.width;
+    // Calculate actual available dimensions based on container size
+    const containerWidth = this.container.clientWidth;
+    const containerHeight = this.container.clientHeight;
+    const tabsHeight = this.tabsContainer.offsetHeight || 40;
+    
+    // Calculate dimensions that will fill the available space
+    const availableWidth = containerWidth > 0 ? containerWidth : this.options.width;
+    const availableHeight = containerHeight > 0 ? containerHeight - tabsHeight : 
+                           (this.options.height ? this.options.height - tabsHeight : undefined);
 
-    // Create options for the spreadsheet with adjusted dimensions
+    // Create options for the spreadsheet with calculated dimensions
     const spreadsheetOptions = {
       ...this.options,
-      height: availableHeight,
       width: availableWidth,
+      height: availableHeight,
+      // Remove any fixed min/max constraints that might limit full utilization
+      minWidth: Math.min(this.options.minWidth || 600, availableWidth || 600),
+      minHeight: Math.min(this.options.minHeight || 400, availableHeight || 400),
     };
 
     // Create spreadsheet visualizer for this dataset with shared stats visualizer
@@ -95,7 +107,7 @@ export class MultiDatasetVisualizer {
 
     // If this is the first tab, activate it
     if (this.tabs.length === 1) {
-      this.activateTab(id);
+      await this.activateTab(id);
     }
   }
 
@@ -200,6 +212,10 @@ export class MultiDatasetVisualizer {
       newTab.container.classList.add("multi-dataset-visualizer__dataset-container--active");
       this.updateTabStyles(id, true);
 
+      // Force layout calculation and resize to ensure spreadsheet takes full space
+      await new Promise(resolve => requestAnimationFrame(resolve));
+      await newTab.spreadsheetVisualizer.resize();
+
       // Update the data provider for the shared stats visualizer with selected columns
       const selectedColumns = newTab.spreadsheetVisualizer.getSelectedColumns();
       await this.sharedStatsVisualizer.setDataProvider(newTab.dataProvider, selectedColumns);
@@ -215,5 +231,44 @@ export class MultiDatasetVisualizer {
         tabElement.classList.remove("multi-dataset-visualizer__tab--active");
       }
     }
+  }
+
+  private setupResizeHandling(): void {
+    // Use ResizeObserver for better performance than window resize events
+    if (window.ResizeObserver) {
+      const resizeObserver = new ResizeObserver(() => {
+        this.handleResize();
+      });
+      resizeObserver.observe(this.container);
+    } else {
+      // Fallback for browsers without ResizeObserver
+      window.addEventListener('resize', () => this.handleResize());
+    }
+  }
+
+  private async handleResize(): Promise<void> {
+    // Trigger resize on the active spreadsheet visualizer
+    const activeTab = this.tabs.find(tab => tab.isActive);
+    if (activeTab) {
+      // Force layout recalculation before resize
+      this.container.offsetHeight;
+      await new Promise(resolve => requestAnimationFrame(resolve));
+      await activeTab.spreadsheetVisualizer.resize();
+    }
+  }
+
+  public async resize(): Promise<void> {
+    // Public method to trigger resize from external components (e.g., BrianApp)
+    await this.handleResize();
+  }
+
+  public destroy(): void {
+    // Clean up all spreadsheet visualizers
+    this.tabs.forEach(tab => {
+      tab.spreadsheetVisualizer.destroy();
+    });
+    
+    // Hide shared stats visualizer
+    this.sharedStatsVisualizer.hide();
   }
 }

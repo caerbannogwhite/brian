@@ -31,7 +31,24 @@ import {
   DEFAULT_DATE_STYLE,
   DEFAULT_DATETIME_STYLE,
   DEFAULT_NULL_STYLE,
+  getDefaultHeaderBackgroundColor,
+  getDefaultHeaderTextColor,
+  getDefaultCellBackgroundColor,
+  getDefaultCellTextColor,
+  getDefaultBorderColor,
+  getDefaultSelectionColor,
+  getDefaultHoverColor,
+  getDefaultScrollbarColor,
+  getDefaultScrollbarThumbColor,
+  getDefaultScrollbarHoverColor,
+  getDefaultBooleanStyle,
+  getDefaultNumericStyle,
+  getDefaultStringStyle,
+  getDefaultDateStyle,
+  getDefaultDatetimeStyle,
+  getDefaultNullStyle,
 } from "./defaults";
+import { listenForThemeChanges } from "./utils/theme";
 import { Column, SpreadsheetOptions, DataProvider } from "./types";
 import { minMax } from "./utils/drawing";
 import { throttle } from "./utils/throttle";
@@ -108,6 +125,9 @@ export class SpreadsheetVisualizer {
 
   // Context menu for export options
   private contextMenu: ContextMenu;
+
+  // Theme management
+  private themeCleanup: (() => void) | null = null;
 
   constructor(
     container: HTMLElement,
@@ -219,6 +239,34 @@ export class SpreadsheetVisualizer {
 
     // Create context menu for export options
     this.contextMenu = new ContextMenu(dataProvider, this.options, () => this.selectedCells);
+
+    // Setup theme change listener
+    this.themeCleanup = listenForThemeChanges(() => {
+      this.updateThemeColors();
+      // Redraw to apply new colors
+      this.updateToDraw(ToDraw.Cells);
+      this.draw().catch(console.error);
+    });
+  }
+
+  private updateThemeColors(): void {
+    // Update colors based on current theme
+    this.options.headerBackgroundColor = getDefaultHeaderBackgroundColor();
+    this.options.headerTextColor = getDefaultHeaderTextColor();
+    this.options.cellBackgroundColor = getDefaultCellBackgroundColor();
+    this.options.cellTextColor = getDefaultCellTextColor();
+    this.options.borderColor = getDefaultBorderColor();
+    this.options.selectionColor = getDefaultSelectionColor();
+    this.options.hoverColor = getDefaultHoverColor();
+    this.options.scrollbarColor = getDefaultScrollbarColor();
+    this.options.scrollbarThumbColor = getDefaultScrollbarThumbColor();
+    this.options.scrollbarHoverColor = getDefaultScrollbarHoverColor();
+    this.options.booleanStyle = getDefaultBooleanStyle();
+    this.options.numericStyle = getDefaultNumericStyle();
+    this.options.stringStyle = getDefaultStringStyle();
+    this.options.dateStyle = getDefaultDateStyle();
+    this.options.datetimeStyle = getDefaultDatetimeStyle();
+    this.options.nullStyle = getDefaultNullStyle();
   }
 
   public async initialize() {
@@ -244,6 +292,22 @@ export class SpreadsheetVisualizer {
     return this.selectedCols.map((colIndex) => this.columns[colIndex]).filter((col) => col !== undefined);
   }
 
+  public destroy(): void {
+    // Clean up theme listener
+    if (this.themeCleanup) {
+      this.themeCleanup();
+      this.themeCleanup = null;
+    }
+
+    // Hide context menu
+    this.contextMenu.hide();
+
+    // Hide stats visualizer if we own it
+    if (this.statsVisualizer && !this.hasStatsPanel) {
+      this.statsVisualizer.hide();
+    }
+  }
+
   private setupEventListeners() {
     // Mouse events
     this.canvas.addEventListener("mousedown", (event) => this.handleMouseDown(event).catch(console.error));
@@ -264,21 +328,21 @@ export class SpreadsheetVisualizer {
   }
 
   private async updateLayout() {
-    // Use explicit dimensions from options if available, otherwise fall back to container dimensions
-    let width: number;
-    let height: number;
+    // Always use container dimensions for responsive behavior, but respect min/max constraints
+    let width = Math.floor(minMax(this.container.clientWidth, this.options.minWidth, this.options.maxWidth));
+    let height = Math.floor(minMax(this.container.clientHeight, this.options.minHeight, this.options.maxHeight));
 
-    if (this.options.width !== undefined) {
+    // Fallback to options dimensions if container has no size (e.g., during initialization)
+    if (width <= 0 && this.options.width !== undefined) {
       width = Math.floor(minMax(this.options.width, this.options.minWidth, this.options.maxWidth));
-    } else {
-      width = Math.floor(minMax(this.container.clientWidth, this.options.minWidth, this.options.maxWidth));
+    }
+    if (height <= 0 && this.options.height !== undefined) {
+      height = Math.floor(minMax(this.options.height, this.options.minHeight, this.options.maxHeight));
     }
 
-    if (this.options.height !== undefined) {
-      height = Math.floor(minMax(this.options.height, this.options.minHeight, this.options.maxHeight));
-    } else {
-      height = Math.floor(minMax(this.container.clientHeight, this.options.minHeight, this.options.maxHeight));
-    }
+    // Ensure we have valid dimensions
+    if (width <= 0) width = this.options.minWidth;
+    if (height <= 0) height = this.options.minHeight;
 
     if (this.hasStatsPanel) {
       // Adjust canvas width to make room for stats panel
@@ -701,10 +765,14 @@ export class SpreadsheetVisualizer {
   }
 
   private async handleResize() {
-    this.updateLayout();
+    await this.updateLayout();
     this.updateToDraw(ToDraw.Cells);
-
     await this.draw();
+  }
+
+  public async resize(): Promise<void> {
+    // Public method to trigger resize from external components
+    await this.handleResize();
   }
 
   private isMouseOverVerticalScrollbar(x: number, _: number): boolean {
