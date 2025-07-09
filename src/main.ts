@@ -1,88 +1,48 @@
 import "./styles/main.scss";
 import { datasetDm, datasetAe } from "./data.ts";
-import { MultiDatasetVisualizer } from "./components/MultiDatasetVisualizer";
-import { DatasetPanel } from "./components/DatasetPanel";
+import { BrianApp } from "./components/BrianApp";
 import { type CdiscDataset } from "./data/types";
 
-// Initialize the application with dataset panel and multi-dataset visualizer
+// Initialize the Brian application with VS Code-like interface
 async function initApplication() {
-  const spreadsheetContainer = document.getElementById("spreadsheet-container");
-  const datasetPanelContainer = document.getElementById("dataset-panel-container");
-  const mainContent = document.getElementById("main-content");
+  const appContainer = document.getElementById("app") || document.body;
 
-  if (!spreadsheetContainer || !datasetPanelContainer || !mainContent) return;
+  // Clear existing content
+  appContainer.innerHTML = '';
 
-  // Calculate dimensions accounting for the dataset panel
-  const windowWidth = window.innerWidth;
-  const windowHeight = window.innerHeight;
-  const panelWidth = 280; // Default panel width
-
-  // Set up the spreadsheet container dimensions
-  const contentWidth = windowWidth - panelWidth;
-  spreadsheetContainer.style.width = `${contentWidth}px`;
-  spreadsheetContainer.style.height = `${windowHeight - 50}px`;
-  spreadsheetContainer.style.border = "1px solid #e0e0e0";
-  spreadsheetContainer.style.borderRadius = "4px";
-  spreadsheetContainer.style.overflow = "hidden";
-  spreadsheetContainer.style.position = "relative";
-
-  // Force a layout calculation
-  spreadsheetContainer.offsetHeight;
-
-  // Get actual computed dimensions
-  const containerRect = spreadsheetContainer.getBoundingClientRect();
-  const actualWidth = Math.floor(containerRect.width);
-  const actualHeight = Math.floor(containerRect.height);
-
-  // Create the multi-dataset visualizer
-  const multiDatasetVisualizer = new MultiDatasetVisualizer(spreadsheetContainer, {
-    width: actualWidth,
-    height: actualHeight,
-    minHeight: 400,
-    minWidth: 600,
-    dateFormat: "yyyy-MM-dd",
-    datetimeFormat: "yyyy-MM-dd HH:mm:ss",
-    numberFormat: { minimumFractionDigits: 2, maximumFractionDigits: 2 },
-  });
-
-  // Create the dataset panel
-  const datasetPanel = new DatasetPanel(datasetPanelContainer, multiDatasetVisualizer);
-
-  // Add available datasets to the panel
-  datasetPanel.addDataset("ae", "ae", "Adverse Events", datasetAe as CdiscDataset);
-  datasetPanel.addDataset("dm", "dm", "Demographics", datasetDm as CdiscDataset);
-
-  // Listen for dataset close events to update panel state
-  const originalCloseDataset = multiDatasetVisualizer.closeDataset.bind(multiDatasetVisualizer);
-  multiDatasetVisualizer.closeDataset = function (id: string) {
-    originalCloseDataset(id);
-    datasetPanel.markDatasetAsUnloaded(id);
-  };
-
-  // Handle panel minimize/maximize to adjust main content margin
-  datasetPanel.setOnToggleCallback((isMinimized: boolean) => {
-    if (isMinimized) {
-      mainContent.classList.add("main-content--panel-minimized");
-      const newContentWidth = window.innerWidth - 48; // Minimized panel width
-      spreadsheetContainer.style.width = `${newContentWidth}px`;
-    } else {
-      mainContent.classList.remove("main-content--panel-minimized");
-      const newContentWidth = window.innerWidth - 280; // Full panel width
-      spreadsheetContainer.style.width = `${newContentWidth}px`;
+  // Create the Brian application
+  const brianApp = new BrianApp(appContainer, {
+    theme: 'auto', // Automatically detect user's preferred theme
+    showDatasetPanel: true,
+    statusBarVisible: true,
+    commandPaletteEnabled: true,
+    spreadsheetOptions: {
+      minHeight: 400,
+      minWidth: 600,
+      dateFormat: "yyyy-MM-dd",
+      datetimeFormat: "yyyy-MM-dd HH:mm:ss",
+      numberFormat: { minimumFractionDigits: 2, maximumFractionDigits: 2 },
     }
   });
 
-  // Handle window resize
-  window.addEventListener("resize", () => {
-    const newWidth = window.innerWidth;
-    const newHeight = window.innerHeight - 50;
-    const isMinimized = datasetPanel.getIsMinimized();
-    const panelCurrentWidth = isMinimized ? 48 : 280;
-    const newContentWidth = newWidth - panelCurrentWidth;
+  // Load sample datasets
+  try {
+    await brianApp.addDataset("dm", "Demographics", datasetDm as CdiscDataset);
+    await brianApp.addDataset("ae", "Adverse Events", datasetAe as CdiscDataset);
+    
+    brianApp.showMessage("Sample datasets loaded successfully", "info");
+  } catch (error) {
+    console.error("Error loading datasets:", error);
+    brianApp.showMessage("Error loading sample datasets", "error");
+  }
 
-    spreadsheetContainer.style.width = `${newContentWidth}px`;
-    spreadsheetContainer.style.height = `${newHeight}px`;
-  });
+  // Make brianApp globally available for debugging
+  (window as any).brianApp = brianApp;
+
+  console.log("Brian application initialized with VS Code-like interface");
+  console.log("- Press Ctrl+P to open the command palette");
+  console.log("- Press F11 to toggle fullscreen");
+  console.log("- Access 'brianApp' from the console for debugging");
 }
 
 // Start the application
