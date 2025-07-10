@@ -1,6 +1,6 @@
 import { getDefaultBorderColor, DEFAULT_BORDER_WIDTH } from "@/components/SpreadsheetVisualizer/defaults";
 import { Column, CellStyle, CellPosition, SpreadsheetOptions } from "../types";
-import { formatCellValue } from "./cellFormatting";
+import { formatCellStyle } from "./cellFormatting";
 
 interface DrawingOptions extends SpreadsheetOptions {
   scrollY: number;
@@ -47,7 +47,7 @@ export function drawCell(
   ctx.strokeRect(x, y, width, height);
 
   // Format and style the cell value
-  const { text, style: typeStyle } = column ? formatCellValue(value, column, options) : { text: value, style: {} };
+  const { text, style: typeStyle } = column ? formatCellStyle(value, column, options) : { text: value, style: {} };
   const finalStyle = { ...style, ...typeStyle };
 
   // Draw text with monospaced font

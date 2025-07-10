@@ -1,5 +1,5 @@
 import { DataProvider, SpreadsheetOptions } from "./types";
-import { formatCellStyle, formatCellValue } from "./utils/cellFormatting";
+import { formatCellValue } from "./utils/cellFormatting";
 
 interface MenuItem {
   label: string;
