@@ -40,6 +40,7 @@ export interface SpreadsheetOptions {
   // Cell options
   cellHeight?: number;
   minCellWidth?: number;
+  maxCellWidth?: number;
   cellPadding?: number;
   rowHeaderWidth?: number;
 
@@ -62,17 +63,15 @@ export interface SpreadsheetOptions {
   scrollbarThumbColor?: string;
   scrollbarHoverColor?: string;
 
-  // Format options
-  booleanStyle?: CellStyle;
-  numericStyle?: CellStyle;
-  stringStyle?: CellStyle;
-  dateStyle?: CellStyle;
-  datetimeStyle?: CellStyle;
-  nullStyle?: CellStyle;
+  naText?: string;
+  textAlign?: "left" | "center" | "right";
 
   numberFormat?: Intl.NumberFormatOptions;
   dateFormat?: string;
   datetimeFormat?: string;
+
+  maxFormatGuessLength?: number;
+  percentFormatGuessFit?: number;
 }
 
 export interface DataProvider {

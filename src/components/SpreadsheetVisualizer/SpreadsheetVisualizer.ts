@@ -10,27 +10,11 @@ import {
   DEFAULT_FONT_FAMILY,
   DEFAULT_HEADER_FONT_SIZE,
   DEFAULT_FONT_SIZE,
-  DEFAULT_HEADER_BACKGROUND_COLOR,
-  DEFAULT_HEADER_TEXT_COLOR,
-  DEFAULT_CELL_BACKGROUND_COLOR,
-  DEFAULT_CELL_TEXT_COLOR,
-  DEFAULT_BORDER_COLOR,
-  DEFAULT_SELECTION_COLOR,
-  DEFAULT_HOVER_COLOR,
-  DEFAULT_SCROLLBAR_THUMB_COLOR,
-  DEFAULT_SCROLLBAR_HOVER_COLOR,
-  DEFAULT_SCROLLBAR_COLOR,
+  DEFAULT_BORDER_WIDTH,
   DEFAULT_SCROLLBAR_WIDTH,
   DEFAULT_DATE_FORMAT,
   DEFAULT_DATETIME_FORMAT,
   DEFAULT_NUMBER_FORMAT,
-  DEFAULT_BORDER_WIDTH,
-  DEFAULT_BOOLEAN_STYLE,
-  DEFAULT_NUMERIC_STYLE,
-  DEFAULT_STRING_STYLE,
-  DEFAULT_DATE_STYLE,
-  DEFAULT_DATETIME_STYLE,
-  DEFAULT_NULL_STYLE,
   getDefaultHeaderBackgroundColor,
   getDefaultHeaderTextColor,
   getDefaultCellBackgroundColor,
@@ -41,12 +25,11 @@ import {
   getDefaultScrollbarColor,
   getDefaultScrollbarThumbColor,
   getDefaultScrollbarHoverColor,
-  getDefaultBooleanStyle,
-  getDefaultNumericStyle,
-  getDefaultStringStyle,
-  getDefaultDateStyle,
-  getDefaultDatetimeStyle,
-  getDefaultNullStyle,
+  DEFAULT_MAX_CELL_WIDTH,
+  DEFAULT_PERCENT_FORMAT_GUESS_FIT,
+  DEFAULT_MAX_FORMAT_GUESS_LENGTH,
+  DEFAULT_TEXT_ALIGN,
+  DEFAULT_NA_TEXT,
 } from "./defaults";
 import { listenForThemeChanges } from "./utils/theme";
 import { Column, SpreadsheetOptions, DataProvider } from "./types";
@@ -54,6 +37,7 @@ import { minMax } from "./utils/drawing";
 import { throttle } from "./utils/throttle";
 import { ColumnStatsVisualizer } from "../ColumnStatsVisualizer/ColumnStatsVisualizer";
 import { ContextMenu } from "./ContextMenu";
+import { formatCellStyle, formatCellValue } from "./utils/cellFormatting";
 
 type RequiredSpreadsheetOptions = Omit<Required<SpreadsheetOptions>, "height" | "width"> & {
   height: number;
@@ -185,6 +169,7 @@ export class SpreadsheetVisualizer {
       // Cell options
       cellHeight: options.cellHeight ?? DEFAULT_CELL_HEIGHT,
       minCellWidth: options.minCellWidth ?? DEFAULT_MIN_CELL_WIDTH,
+      maxCellWidth: options.maxCellWidth ?? DEFAULT_MAX_CELL_WIDTH,
       cellPadding: options.cellPadding ?? DEFAULT_CELL_PADDING,
       rowHeaderWidth: options.rowHeaderWidth ?? DEFAULT_ROW_HEADER_WIDTH,
 
@@ -193,31 +178,29 @@ export class SpreadsheetVisualizer {
       fontFamily: options.fontFamily ?? DEFAULT_FONT_FAMILY,
       fontSize: options.fontSize ?? DEFAULT_FONT_SIZE,
       headerFontSize: options.headerFontSize ?? DEFAULT_HEADER_FONT_SIZE,
-      headerBackgroundColor: options.headerBackgroundColor ?? DEFAULT_HEADER_BACKGROUND_COLOR,
-      headerTextColor: options.headerTextColor ?? DEFAULT_HEADER_TEXT_COLOR,
-      cellBackgroundColor: options.cellBackgroundColor ?? DEFAULT_CELL_BACKGROUND_COLOR,
-      cellTextColor: options.cellTextColor ?? DEFAULT_CELL_TEXT_COLOR,
-      borderColor: options.borderColor ?? DEFAULT_BORDER_COLOR,
-      selectionColor: options.selectionColor ?? DEFAULT_SELECTION_COLOR,
-      hoverColor: options.hoverColor ?? DEFAULT_HOVER_COLOR,
+      headerBackgroundColor: options.headerBackgroundColor ?? getDefaultHeaderBackgroundColor(),
+      headerTextColor: options.headerTextColor ?? getDefaultHeaderTextColor(),
+      cellBackgroundColor: options.cellBackgroundColor ?? getDefaultCellBackgroundColor(),
+      cellTextColor: options.cellTextColor ?? getDefaultCellTextColor(),
+      borderColor: options.borderColor ?? getDefaultBorderColor(),
+      selectionColor: options.selectionColor ?? getDefaultSelectionColor(),
+      hoverColor: options.hoverColor ?? getDefaultHoverColor(),
 
       // Scrollbar options
       scrollbarWidth: options.scrollbarWidth ?? DEFAULT_SCROLLBAR_WIDTH,
-      scrollbarColor: options.scrollbarColor ?? DEFAULT_SCROLLBAR_COLOR,
-      scrollbarThumbColor: options.scrollbarThumbColor ?? DEFAULT_SCROLLBAR_THUMB_COLOR,
-      scrollbarHoverColor: options.scrollbarHoverColor ?? DEFAULT_SCROLLBAR_HOVER_COLOR,
-
-      // Format options
-      booleanStyle: options.booleanStyle ?? DEFAULT_BOOLEAN_STYLE,
-      numericStyle: options.numericStyle ?? DEFAULT_NUMERIC_STYLE,
-      stringStyle: options.stringStyle ?? DEFAULT_STRING_STYLE,
-      dateStyle: options.dateStyle ?? DEFAULT_DATE_STYLE,
-      datetimeStyle: options.datetimeStyle ?? DEFAULT_DATETIME_STYLE,
-      nullStyle: options.nullStyle ?? DEFAULT_NULL_STYLE,
+      scrollbarColor: options.scrollbarColor ?? getDefaultScrollbarColor(),
+      scrollbarThumbColor: options.scrollbarThumbColor ?? getDefaultScrollbarThumbColor(),
+      scrollbarHoverColor: options.scrollbarHoverColor ?? getDefaultScrollbarHoverColor(),
 
       dateFormat: options.dateFormat ?? DEFAULT_DATE_FORMAT,
       datetimeFormat: options.datetimeFormat ?? DEFAULT_DATETIME_FORMAT,
       numberFormat: options.numberFormat ?? DEFAULT_NUMBER_FORMAT,
+
+      naText: options.naText ?? DEFAULT_NA_TEXT,
+      textAlign: options.textAlign ?? DEFAULT_TEXT_ALIGN,
+
+      maxFormatGuessLength: options.maxFormatGuessLength ?? DEFAULT_MAX_FORMAT_GUESS_LENGTH,
+      percentFormatGuessFit: options.percentFormatGuessFit ?? DEFAULT_PERCENT_FORMAT_GUESS_FIT,
     };
 
     // Apply constraints
@@ -261,12 +244,6 @@ export class SpreadsheetVisualizer {
     this.options.scrollbarColor = getDefaultScrollbarColor();
     this.options.scrollbarThumbColor = getDefaultScrollbarThumbColor();
     this.options.scrollbarHoverColor = getDefaultScrollbarHoverColor();
-    this.options.booleanStyle = getDefaultBooleanStyle();
-    this.options.numericStyle = getDefaultNumericStyle();
-    this.options.stringStyle = getDefaultStringStyle();
-    this.options.dateStyle = getDefaultDateStyle();
-    this.options.datetimeStyle = getDefaultDatetimeStyle();
-    this.options.nullStyle = getDefaultNullStyle();
   }
 
   public async initialize() {
@@ -389,13 +366,32 @@ export class SpreadsheetVisualizer {
     await this.draw();
   }
 
-  private calculateColumnWidths() {
+  private guessColumnWidths(values: any[][], col: Column, colIndex: number): number {
+    const widths = [this.ctx.measureText(col.name).width + this.options.cellPadding * 2];
+
+    for (const row of values) {
+      const text = formatCellValue(row[colIndex], this.options);
+      const width = this.ctx.measureText(text).width + this.options.cellPadding * 2;
+      widths.push(width);
+    }
+
+    // sort the widths and get the percentile given by percentFormatGuessFit
+    const sortedWidths = widths.sort((a, b) => a - b);
+    const percentile = Math.floor(sortedWidths.length * this.options.percentFormatGuessFit);
+    const width = sortedWidths[percentile];
+
+    return minMax(width, this.options.minCellWidth, this.options.maxCellWidth);
+  }
+
+  private async calculateColumnWidths() {
+    // Get all rows from the first to maxFormatGuessLength
+    const rows = await this.dataProvider.fetchData(0, this.options.maxFormatGuessLength, 0, this.totalCols);
+
     const availableWidth = this.canvas.width - this.options.rowHeaderWidth;
 
     // Calculate minimum widths based on content
-    this.colWidths = this.columns.map((col) => {
-      const headerWidth = this.ctx.measureText(col.name).width + this.options.cellPadding * 2;
-      return Math.max(headerWidth, this.options.minCellWidth);
+    this.colWidths = this.columns.map((col, colIndex) => {
+      return this.guessColumnWidths(rows, col, colIndex);
     });
 
     // Calculate column offsets
@@ -904,18 +900,21 @@ export class SpreadsheetVisualizer {
 
         // Draw cell text
         ctx.fillStyle = this.options.cellTextColor;
-        const text = formatCellValue(data[row][col], this.options);
+        const { text, style } = formatCellStyle(data[row][col], column, this.options);
         const textX = x + this.options.cellPadding;
         const textY = y + this.options.cellHeight / 2;
 
+        ctx.fillStyle = style.textColor || this.options.cellTextColor;
+        ctx.fillText(text, textX, textY);
+
         // Align text based on data type
-        if (column.dataType === "number" || column.dataType === "date" || column.dataType === "datetime") {
-          ctx.textAlign = "right";
-          ctx.fillText(text, x + cellWidth - this.options.cellPadding, textY);
-        } else {
-          ctx.textAlign = "left";
-          ctx.fillText(text, textX, textY);
-        }
+        // if (column.dataType === "number" || column.dataType === "date" || column.dataType === "datetime") {
+        //   ctx.textAlign = "right";
+        //   ctx.fillText(text, x + cellWidth - this.options.cellPadding, textY);
+        // } else {
+        //   ctx.textAlign = "left";
+        //   ctx.fillText(text, textX, textY);
+        // }
 
         // Draw cell border
         ctx.strokeStyle = this.options.borderColor;
@@ -1154,33 +1153,3 @@ export class SpreadsheetVisualizer {
     }
   }
 }
-
-export const formatCellValue = (value: any, options: SpreadsheetOptions): string => {
-  if (value === null || value === undefined) return "NA";
-  if (typeof value === "string") return value;
-  if (typeof value === "number") return value.toLocaleString(undefined, options.numberFormat);
-  if (value instanceof Date) {
-    const format = value.getHours() === 0 && value.getMinutes() === 0 ? options.dateFormat : options.datetimeFormat;
-    if (!format) return "NA";
-
-    return format.replace(/yyyy|MM|dd|HH|mm|ss/g, (match) => {
-      switch (match) {
-        case "yyyy":
-          return value.getFullYear().toString();
-        case "MM":
-          return (value.getMonth() + 1).toString().padStart(2, "0");
-        case "dd":
-          return value.getDate().toString().padStart(2, "0");
-        case "HH":
-          return value.getHours().toString().padStart(2, "0");
-        case "mm":
-          return value.getMinutes().toString().padStart(2, "0");
-        case "ss":
-          return value.getSeconds().toString().padStart(2, "0");
-        default:
-          return match;
-      }
-    });
-  }
-  return String(value);
-};

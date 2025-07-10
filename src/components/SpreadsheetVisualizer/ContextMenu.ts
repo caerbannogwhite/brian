@@ -1,5 +1,5 @@
 import { DataProvider, SpreadsheetOptions } from "./types";
-import { formatCellValue } from "./SpreadsheetVisualizer";
+import { formatCellStyle, formatCellValue } from "./utils/cellFormatting";
 
 interface MenuItem {
   label: string;
@@ -113,9 +113,7 @@ export class ContextMenu {
 
   private async exportAsText(separator: string) {
     const selectedCells = this.getSelectedCells();
-
     if (!selectedCells) return;
-
     const { startRow, endRow, startCol, endCol } = selectedCells;
     const columns = (await this.dataProvider.getMetadata()).columns;
     const data = await this.dataProvider.fetchData(
@@ -124,7 +122,6 @@ export class ContextMenu {
       Math.min(startCol, endCol),
       Math.max(startCol, endCol)
     );
-
     // Get column headers for the selected range
     const headers = [];
     for (let col = Math.min(startCol, endCol); col <= Math.max(startCol, endCol); col++) {
@@ -147,7 +144,6 @@ export class ContextMenu {
           .join(separator)
       ),
     ].join("\n");
-
     try {
       await navigator.clipboard.writeText(csvContent);
     } catch (err) {
@@ -165,9 +161,7 @@ export class ContextMenu {
 
   public async exportAsHTML() {
     const selectedCells = this.getSelectedCells();
-
     if (!selectedCells) return;
-
     const { startRow, endRow, startCol, endCol } = selectedCells;
     const columns = (await this.dataProvider.getMetadata()).columns;
     const data = await this.dataProvider.fetchData(
@@ -176,28 +170,25 @@ export class ContextMenu {
       Math.min(startCol, endCol),
       Math.max(startCol, endCol)
     );
-
     // Get column headers for the selected range
     const headers = [];
     for (let col = Math.min(startCol, endCol); col <= Math.max(startCol, endCol); col++) {
       headers.push(columns[col].name);
     }
-
     // Create HTML table
     const htmlContent = `
-<table border="1" cellpadding="5" cellspacing="0" style="border-collapse: collapse; font-family: Arial, sans-serif;">
-  <thead>
-    <tr>
-      ${headers.map((header) => `<th style="background-color: #f2f2f2; padding: 8px; text-align: left;">${header}</th>`).join("")}
-    </tr>
-  </thead>
-  <tbody>
-    ${data
-      .map((row) => `<tr>${row.map((cell) => `<td style="padding: 8px;">${formatCellValue(cell, this.options)}</td>`).join("")}</tr>`)
-      .join("")}
-  </tbody>
-</table>`;
-
+    <table border="1" cellpadding="5" cellspacing="0" style="border-collapse: collapse; font-family: Arial, sans-serif;">
+      <thead>
+        <tr>
+          ${headers.map((header) => `<th style="background-color: #f2f2f2; padding: 8px; text-align: left;">${header}</th>`).join("")}
+        </tr>
+      </thead>
+      <tbody>
+        ${data
+          .map((row) => `<tr>${row.map((cell) => `<td style="padding: 8px;">${formatCellValue(cell, this.options)}</td>`).join("")}</tr>`)
+          .join("")}
+      </tbody>
+    </table>`;
     try {
       await navigator.clipboard.writeText(htmlContent);
     } catch (err) {

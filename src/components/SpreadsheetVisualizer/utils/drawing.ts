@@ -1,4 +1,4 @@
-import { DEFAULT_BORDER_COLOR, DEFAULT_BORDER_WIDTH } from "@/components/SpreadsheetVisualizer/defaults";
+import { getDefaultBorderColor, DEFAULT_BORDER_WIDTH } from "@/components/SpreadsheetVisualizer/defaults";
 import { Column, CellStyle, CellPosition, SpreadsheetOptions } from "../types";
 import { formatCellValue } from "./cellFormatting";
 
@@ -34,7 +34,7 @@ export function drawCell(
   column: Column | undefined,
   options: SpreadsheetOptions
 ): void {
-  const borderColor = options.borderColor ?? DEFAULT_BORDER_COLOR;
+  const borderColor = options.borderColor ?? getDefaultBorderColor();
   const borderWidth = options.borderWidth ?? DEFAULT_BORDER_WIDTH;
 
   // Draw cell background

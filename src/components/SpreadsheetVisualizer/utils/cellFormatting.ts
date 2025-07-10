@@ -1,3 +1,5 @@
+import { DEFAULT_NA_TEXT } from "../defaults";
+import { SpreadsheetVisualizer } from "../SpreadsheetVisualizer";
 import { Column, CellStyle, SpreadsheetOptions } from "../types";
 
 export function parseFormat(format: string | undefined, type: "number" | "date" | "datetime"): any {
@@ -73,11 +75,11 @@ export function getFormatOptions(column: Column, type: "number" | "date" | "date
   }
 }
 
-export function formatCellValue(value: any, column: Column, options: SpreadsheetOptions): { text: string; style: Partial<CellStyle> } {
+export function formatCellStyle(value: any, column: Column, options: SpreadsheetOptions): { text: string; style: Partial<CellStyle> } {
   if (value === null || value === undefined) {
     return {
-      text: "NA",
-      style: options.nullStyle || { textColor: "#cc0000" },
+      text: options.naText || DEFAULT_NA_TEXT,
+      style: { textColor: "#cc0000" },
     };
   }
 
@@ -89,7 +91,7 @@ export function formatCellValue(value: any, column: Column, options: Spreadsheet
         const formattedValue = formatOptions ? new Intl.NumberFormat(undefined, formatOptions).format(numValue) : numValue.toString();
         return {
           text: formattedValue,
-          style: options.numericStyle || { textAlign: "right", textColor: "#0066cc" },
+          style: { textAlign: "right", textColor: options.cellTextColor },
         };
       }
       break;
@@ -106,7 +108,7 @@ export function formatCellValue(value: any, column: Column, options: Spreadsheet
           : dateValue.toLocaleString();
         return {
           text: formattedValue,
-          style: options.dateStyle || { textAlign: "right", textColor: "#006633" },
+          style: { textAlign: "right", textColor: "#006633" },
         };
       }
       break;
@@ -114,7 +116,7 @@ export function formatCellValue(value: any, column: Column, options: Spreadsheet
     case "boolean":
       return {
         text: value ? "Yes" : "No",
-        style: { textAlign: "center" },
+        style: { textAlign: "right", textColor: "#0066cc" },
       };
 
     case "string":
@@ -130,3 +132,33 @@ export function formatCellValue(value: any, column: Column, options: Spreadsheet
     style: {},
   };
 }
+
+export const formatCellValue = (value: any, options: SpreadsheetOptions): string => {
+  if (value === null || value === undefined) return "NA";
+  if (typeof value === "string") return value;
+  if (typeof value === "number") return value.toLocaleString(undefined, options.numberFormat);
+  if (value instanceof Date) {
+    const format = value.getHours() === 0 && value.getMinutes() === 0 ? options.dateFormat : options.datetimeFormat;
+    if (!format) return "NA";
+
+    return format.replace(/yyyy|MM|dd|HH|mm|ss/g, (match) => {
+      switch (match) {
+        case "yyyy":
+          return value.getFullYear().toString();
+        case "MM":
+          return (value.getMonth() + 1).toString().padStart(2, "0");
+        case "dd":
+          return value.getDate().toString().padStart(2, "0");
+        case "HH":
+          return value.getHours().toString().padStart(2, "0");
+        case "mm":
+          return value.getMinutes().toString().padStart(2, "0");
+        case "ss":
+          return value.getSeconds().toString().padStart(2, "0");
+        default:
+          return match;
+      }
+    });
+  }
+  return String(value);
+};
