@@ -4,6 +4,7 @@ import { StatusBar } from "../StatusBar";
 import { CommandPalette } from "../CommandPalette";
 import { SpreadsheetOptions } from "../SpreadsheetVisualizer/types";
 import { CdiscDataset } from "../../data/types";
+import { CdiscDataProvider } from "../../data/providers/CdiscDataProvider";
 
 export interface BrianAppOptions {
   spreadsheetOptions?: SpreadsheetOptions;
@@ -95,6 +96,9 @@ export class BrianApp {
 
     // Listen for dataset changes
     this.setupDatasetListeners();
+    
+    // Setup file drop handling
+    this.setupFileDropHandling();
   }
 
   private setupTheme(): void {
@@ -291,6 +295,36 @@ export class BrianApp {
       // TODO: Get actual dataset info from the visualizer
       this.statusBar.updateDatasetInfo(activeId, 0, 0);
     }
+  }
+
+  private setupFileDropHandling(): void {
+    this.multiDatasetVisualizer.setOnFileDroppedCallback(async (dataset: CdiscDataset, fileName: string) => {
+      try {
+        // Generate a unique ID for the dataset
+        const datasetId = dataset.name.toLowerCase();
+        
+        // Add to dataset panel first
+        this.datasetPanel.addDataset(datasetId, datasetId, dataset.label || dataset.name, dataset);
+        
+        // Create data provider and add to visualizer
+        const dataProvider = new CdiscDataProvider(dataset);
+        await this.multiDatasetVisualizer.addDataset(datasetId, dataset.label || dataset.name, dataProvider);
+        
+        // Mark as loaded in panel
+        this.datasetPanel.markDatasetAsLoaded(datasetId);
+        
+        // Update status bar
+        this.updateStatusBarDatasetInfo();
+        
+        // Show success message
+        this.showMessage(`Dataset "${fileName}" loaded successfully`, "info");
+        
+      } catch (error) {
+        console.error("Error adding dropped dataset:", error);
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+        this.showMessage(`Failed to load dataset: ${errorMessage}`, "error");
+      }
+    });
   }
 
   // Public API methods

@@ -2,6 +2,8 @@ import { SpreadsheetVisualizer } from "../SpreadsheetVisualizer";
 import { DataProvider } from "../SpreadsheetVisualizer/types";
 import { SpreadsheetOptions } from "../SpreadsheetVisualizer/types";
 import { ColumnStatsVisualizer } from "../ColumnStatsVisualizer/ColumnStatsVisualizer";
+import { DragDropZone } from "../DragDropZone";
+import { CdiscDataset } from "../../data/types";
 
 interface DatasetTab {
   id: string;
@@ -20,6 +22,8 @@ export class MultiDatasetVisualizer {
   private activeTabId: string | null = null;
   private options: SpreadsheetOptions;
   private sharedStatsVisualizer: ColumnStatsVisualizer;
+  private dragDropZone: DragDropZone | null = null;
+  private onFileDropped?: (dataset: CdiscDataset, fileName: string) => void;
 
   constructor(parent: HTMLElement, options: SpreadsheetOptions = {}) {
     this.container = document.createElement("div");
@@ -54,6 +58,9 @@ export class MultiDatasetVisualizer {
 
     // Setup resize handling
     this.setupResizeHandling();
+    
+    // Show drag-drop zone initially since no datasets are loaded
+    this.showEmptyState();
   }
 
   public async addDataset(id: string, name: string, dataProvider: DataProvider): Promise<void> {
@@ -105,8 +112,9 @@ export class MultiDatasetVisualizer {
     // Initialize the spreadsheet
     await spreadsheetVisualizer.initialize();
 
-    // If this is the first tab, activate it
+    // If this is the first tab, activate it and hide empty state
     if (this.tabs.length === 1) {
+      this.hideEmptyState();
       await this.activateTab(id);
     }
   }
@@ -146,6 +154,8 @@ export class MultiDatasetVisualizer {
         this.contentContainer.innerHTML = "";
         // Hide stats visualizer when no datasets are active
         this.sharedStatsVisualizer.hide();
+        // Show empty state when no datasets remain
+        this.showEmptyState();
       }
     }
 
@@ -159,6 +169,10 @@ export class MultiDatasetVisualizer {
 
   public getDatasetIds(): string[] {
     return this.tabs.map((t) => t.id);
+  }
+
+  public setOnFileDroppedCallback(callback: (dataset: CdiscDataset, fileName: string) => void): void {
+    this.onFileDropped = callback;
   }
 
   private createTabElement(tab: DatasetTab): void {
@@ -270,5 +284,35 @@ export class MultiDatasetVisualizer {
     
     // Hide shared stats visualizer
     this.sharedStatsVisualizer.hide();
+    
+    // Clean up drag drop zone
+    if (this.dragDropZone) {
+      this.dragDropZone.destroy();
+      this.dragDropZone = null;
+    }
+  }
+
+  private showEmptyState(): void {
+    if (!this.dragDropZone) {
+      this.dragDropZone = new DragDropZone(this.contentContainer, {
+        onFileDropped: (dataset: CdiscDataset, fileName: string) => {
+          if (this.onFileDropped) {
+            this.onFileDropped(dataset, fileName);
+          }
+        },
+        onError: (error: string) => {
+          console.error('DragDropZone Error:', error);
+          // You could emit this error to a parent component for better error handling
+        }
+      });
+    } else {
+      this.dragDropZone.show();
+    }
+  }
+
+  private hideEmptyState(): void {
+    if (this.dragDropZone) {
+      this.dragDropZone.hide();
+    }
   }
 }

@@ -6,6 +6,7 @@ export { SpreadsheetVisualizer } from './components/SpreadsheetVisualizer';
 export { ColumnStatsVisualizer } from './components/ColumnStatsVisualizer/ColumnStatsVisualizer';
 export { StatusBar } from './components/StatusBar';
 export { CommandPalette } from './components/CommandPalette';
+export { DragDropZone } from './components/DragDropZone';
 
 // Data types and utilities
 export type { CdiscDataset, CdiscColumn } from './data/types';
@@ -16,6 +17,11 @@ export { CdiscDataProvider } from './data/providers/CdiscDataProvider';
 export type { BrianAppOptions } from './components/BrianApp';
 export type { StatusBarItem } from './components/StatusBar';
 export type { Command } from './components/CommandPalette';
+export type { DragDropZoneOptions } from './components/DragDropZone';
+
+// File parsing utilities
+export { parseFile, isSupportedFileType, getSupportedFileTypes } from './data/fileParser';
+export type { ParseOptions, ParseResult } from './data/fileParser';
 
 // SpreadsheetVisualizer types
 export type { 

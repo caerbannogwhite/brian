@@ -25,15 +25,21 @@ async function initApplication() {
     }
   });
 
-  // Load sample datasets
-  try {
-    await brianApp.addDataset("dm", "Demographics", datasetDm as CdiscDataset);
-    await brianApp.addDataset("ae", "Adverse Events", datasetAe as CdiscDataset);
-    
-    brianApp.showMessage("Sample datasets loaded successfully", "info");
-  } catch (error) {
-    console.error("Error loading datasets:", error);
-    brianApp.showMessage("Error loading sample datasets", "error");
+  // Option to load sample datasets for development
+  const loadSampleData = false; // Set to true to load sample datasets
+  
+  if (loadSampleData) {
+    try {
+      await brianApp.addDataset("dm", "Demographics", datasetDm as CdiscDataset);
+      await brianApp.addDataset("ae", "Adverse Events", datasetAe as CdiscDataset);
+      
+      brianApp.showMessage("Sample datasets loaded successfully", "info");
+    } catch (error) {
+      console.error("Error loading datasets:", error);
+      brianApp.showMessage("Error loading sample datasets", "error");
+    }
+  } else {
+    brianApp.showMessage("Drop a CSV, TSV, or TXT file to get started", "info");
   }
 
   // Make brianApp globally available for debugging
