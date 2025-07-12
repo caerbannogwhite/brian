@@ -1,3 +1,11 @@
+v0.4.0:
+ - [Feature] Added Command Palette for improved interactivity
+ - [Feature] Added drag and drop support for file upload
+ - [Feature] Addes Status Bar
+ - [Enhanced] Cell styling and formatting
+ - [Enhanced] Zooming added
+ - [Bug-fix] Fixed scrolling and column selection issues
+
 v0.3.0-guard:
  - [Feature] Multi-dataset support: visualize multiple datasets in different tabs
  - [Feature] Export selection menu: CSV, TSV, HTML and Markdown
