@@ -19,18 +19,27 @@ export const DEFAULT_MAX_CELL_WIDTH = 1000;
 export const DEFAULT_CELL_PADDING = 8;
 export const DEFAULT_ROW_HEADER_WIDTH = 60;
 
+// Rendering options
+export const DEFAULT_TEXT_RENDERING = "geometricPrecision";
+export const DEFAULT_LETTER_SPACING = "1px";
+export const DEFAULT_IMAGE_SMOOTHING_ENABLED = true;
+export const DEFAULT_IMAGE_SMOOTHING_QUALITY = "high";
+
 export const DEFAULT_BORDER_WIDTH = 1;
-export const DEFAULT_FONT_FAMILY = "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif";
-export const DEFAULT_FONT_SIZE = 13;
-export const DEFAULT_HEADER_FONT_SIZE = 13;
+export const DEFAULT_FONT_FAMILY = "Consolas, 'Courier New', monospace";
+export const DEFAULT_FONT_SIZE = 14;
+export const DEFAULT_HEADER_FONT_SIZE = 14;
 
 export const DEFAULT_SCROLLBAR_WIDTH = 12;
 
+export const DEFAULT_NA_TEXT = "NA";
+export const DEFAULT_TRUE_TEXT = "TRUE";
+export const DEFAULT_FALSE_TEXT = "FALSE";
 export const DEFAULT_TEXT_ALIGN = "left" as const;
 export const DEFAULT_DATE_FORMAT = "yyyy-MM-dd";
 export const DEFAULT_DATETIME_FORMAT = "yyyy-MM-dd HH:mm:ss";
-export const DEFAULT_NA_TEXT = "NA";
 export const DEFAULT_NUMBER_FORMAT = { minimumFractionDigits: 2, maximumFractionDigits: 2 };
+export const DEFAULT_DATETIME_LOCALE = new Intl.Locale("en-UK");
 
 export const DEFAULT_MAX_FORMAT_GUESS_LENGTH = 30;
 export const DEFAULT_PERCENT_FORMAT_GUESS_FIT = 0.8;

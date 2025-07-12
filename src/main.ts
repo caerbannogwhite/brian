@@ -26,7 +26,7 @@ async function initApplication() {
   });
 
   // Option to load sample datasets for development
-  const loadSampleData = false; // Set to true to load sample datasets
+  const loadSampleData = true; // Set to true to load sample datasets
   
   if (loadSampleData) {
     try {

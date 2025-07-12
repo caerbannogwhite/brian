@@ -58,7 +58,7 @@ export class MultiDatasetVisualizer {
 
     // Setup resize handling
     this.setupResizeHandling();
-    
+
     // Show drag-drop zone initially since no datasets are loaded
     this.showEmptyState();
   }
@@ -78,11 +78,11 @@ export class MultiDatasetVisualizer {
     const containerWidth = this.container.clientWidth;
     const containerHeight = this.container.clientHeight;
     const tabsHeight = this.tabsContainer.offsetHeight || 40;
-    
+
     // Calculate dimensions that will fill the available space
     const availableWidth = containerWidth > 0 ? containerWidth : this.options.width;
-    const availableHeight = containerHeight > 0 ? containerHeight - tabsHeight : 
-                           (this.options.height ? this.options.height - tabsHeight : undefined);
+    const availableHeight =
+      containerHeight > 0 ? containerHeight - tabsHeight : this.options.height ? this.options.height - tabsHeight : undefined;
 
     // Create options for the spreadsheet with calculated dimensions
     const spreadsheetOptions = {
@@ -227,12 +227,11 @@ export class MultiDatasetVisualizer {
       this.updateTabStyles(id, true);
 
       // Force layout calculation and resize to ensure spreadsheet takes full space
-      await new Promise(resolve => requestAnimationFrame(resolve));
+      await new Promise((resolve) => requestAnimationFrame(resolve));
       await newTab.spreadsheetVisualizer.resize();
 
-      // Update the data provider for the shared stats visualizer with selected columns
-      const selectedColumns = newTab.spreadsheetVisualizer.getSelectedColumns();
-      await this.sharedStatsVisualizer.setDataProvider(newTab.dataProvider, selectedColumns);
+      // Update the shared stats visualizer with the new spreadsheet visualizer
+      await this.sharedStatsVisualizer.setSpreadsheetVisualizer(newTab.spreadsheetVisualizer);
     }
   }
 
@@ -256,17 +255,17 @@ export class MultiDatasetVisualizer {
       resizeObserver.observe(this.container);
     } else {
       // Fallback for browsers without ResizeObserver
-      window.addEventListener('resize', () => this.handleResize());
+      window.addEventListener("resize", () => this.handleResize());
     }
   }
 
   private async handleResize(): Promise<void> {
     // Trigger resize on the active spreadsheet visualizer
-    const activeTab = this.tabs.find(tab => tab.isActive);
+    const activeTab = this.tabs.find((tab) => tab.isActive);
     if (activeTab) {
       // Force layout recalculation before resize
       this.container.offsetHeight;
-      await new Promise(resolve => requestAnimationFrame(resolve));
+      await new Promise((resolve) => requestAnimationFrame(resolve));
       await activeTab.spreadsheetVisualizer.resize();
     }
   }
@@ -278,13 +277,13 @@ export class MultiDatasetVisualizer {
 
   public destroy(): void {
     // Clean up all spreadsheet visualizers
-    this.tabs.forEach(tab => {
+    this.tabs.forEach((tab) => {
       tab.spreadsheetVisualizer.destroy();
     });
-    
+
     // Hide shared stats visualizer
     this.sharedStatsVisualizer.hide();
-    
+
     // Clean up drag drop zone
     if (this.dragDropZone) {
       this.dragDropZone.destroy();
@@ -301,9 +300,9 @@ export class MultiDatasetVisualizer {
           }
         },
         onError: (error: string) => {
-          console.error('DragDropZone Error:', error);
+          console.error("DragDropZone Error:", error);
           // You could emit this error to a parent component for better error handling
-        }
+        },
       });
     } else {
       this.dragDropZone.show();

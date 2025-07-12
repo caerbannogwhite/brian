@@ -1,4 +1,4 @@
-import { ScrollbarState } from "../types";
+import { ScrollbarState } from "../internals";
 
 interface ScrollbarOptions {
   width: number;

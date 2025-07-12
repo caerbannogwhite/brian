@@ -1,5 +1,4 @@
-import { DataProvider, SpreadsheetOptions } from "./types";
-import { formatCellValue } from "./utils/cellFormatting";
+import { SpreadsheetVisualizer } from "./SpreadsheetVisualizer";
 
 interface MenuItem {
   label: string;
@@ -9,18 +8,10 @@ interface MenuItem {
 export class ContextMenu {
   private contextMenu: HTMLElement;
   private menuItems: MenuItem[];
-  private dataProvider: DataProvider;
-  private options: SpreadsheetOptions;
-  private getSelectedCells: () => { startRow: number; endRow: number; startCol: number; endCol: number } | null;
+  private spreadsheetVisualizer: SpreadsheetVisualizer;
 
-  constructor(
-    dataProvider: DataProvider,
-    options: SpreadsheetOptions,
-    getSelectedCells: () => { startRow: number; endRow: number; startCol: number; endCol: number } | null
-  ) {
-    this.dataProvider = dataProvider;
-    this.options = options;
-    this.getSelectedCells = getSelectedCells;
+  constructor(spreadsheetVisualizer: SpreadsheetVisualizer) {
+    this.spreadsheetVisualizer = spreadsheetVisualizer;
 
     this.contextMenu = document.createElement("div");
     this.contextMenu.id = "spreadsheet-context-menu";
@@ -77,7 +68,7 @@ export class ContextMenu {
     event.preventDefault();
     event.stopPropagation();
 
-    const selectedCells = this.getSelectedCells();
+    const selectedCells = await this.spreadsheetVisualizer.getSelectedFormattedValues();
 
     // Only show context menu if there are selected cells
     if (!selectedCells) return;
@@ -112,34 +103,21 @@ export class ContextMenu {
   }
 
   private async exportAsText(separator: string) {
-    const selectedCells = this.getSelectedCells();
+    const selectedCells = await this.spreadsheetVisualizer.getSelectedFormattedValues();
     if (!selectedCells) return;
-    const { startRow, endRow, startCol, endCol } = selectedCells;
-    const columns = (await this.dataProvider.getMetadata()).columns;
-    const data = await this.dataProvider.fetchData(
-      Math.min(startRow, endRow),
-      Math.max(startRow, endRow),
-      Math.min(startCol, endCol),
-      Math.max(startCol, endCol)
-    );
-    // Get column headers for the selected range
-    const headers = [];
-    for (let col = Math.min(startCol, endCol); col <= Math.max(startCol, endCol); col++) {
-      headers.push(columns[col].name);
-    }
+    const { headers, data } = selectedCells;
 
     // Create CSV content with headers
     const csvContent = [
       headers.join(separator),
       ...data.map((row) =>
         row
-          .map((cell) => {
-            const value = formatCellValue(cell, this.options);
+          .map((formatted) => {
             // Escape quotes and wrap in quotes if contains comma, quote, or newline
-            if (value.includes(separator) || value.includes('"') || value.includes("\n")) {
-              return `"${value.replace(/"/g, '""')}"`;
+            if (formatted.includes(separator) || formatted.includes('"') || formatted.includes("\n")) {
+              return `"${formatted.replace(/"/g, '""')}"`;
             }
-            return value;
+            return formatted;
           })
           .join(separator)
       ),
@@ -160,21 +138,10 @@ export class ContextMenu {
   }
 
   public async exportAsHTML() {
-    const selectedCells = this.getSelectedCells();
+    const selectedCells = await this.spreadsheetVisualizer.getSelectedFormattedValues();
     if (!selectedCells) return;
-    const { startRow, endRow, startCol, endCol } = selectedCells;
-    const columns = (await this.dataProvider.getMetadata()).columns;
-    const data = await this.dataProvider.fetchData(
-      Math.min(startRow, endRow),
-      Math.max(startRow, endRow),
-      Math.min(startCol, endCol),
-      Math.max(startCol, endCol)
-    );
-    // Get column headers for the selected range
-    const headers = [];
-    for (let col = Math.min(startCol, endCol); col <= Math.max(startCol, endCol); col++) {
-      headers.push(columns[col].name);
-    }
+    const { headers, data } = selectedCells;
+
     // Create HTML table
     const htmlContent = `
     <table border="1" cellpadding="5" cellspacing="0" style="border-collapse: collapse; font-family: Arial, sans-serif;">
@@ -184,9 +151,7 @@ export class ContextMenu {
         </tr>
       </thead>
       <tbody>
-        ${data
-          .map((row) => `<tr>${row.map((cell) => `<td style="padding: 8px;">${formatCellValue(cell, this.options)}</td>`).join("")}</tr>`)
-          .join("")}
+        ${data.map((row) => `<tr>${row.map((cell) => `<td style="padding: 8px;">${cell}</td>`).join("")}</tr>`).join("")}
       </tbody>
     </table>`;
     try {
@@ -197,31 +162,15 @@ export class ContextMenu {
   }
 
   public async exportAsMarkdown() {
-    const selectedCells = this.getSelectedCells();
-
+    const selectedCells = await this.spreadsheetVisualizer.getSelectedFormattedValues();
     if (!selectedCells) return;
-
-    const { startRow, endRow, startCol, endCol } = selectedCells;
-    const columns = (await this.dataProvider.getMetadata()).columns;
-
-    const data = await this.dataProvider.fetchData(
-      Math.min(startRow, endRow),
-      Math.max(startRow, endRow),
-      Math.min(startCol, endCol),
-      Math.max(startCol, endCol)
-    );
-
-    // Get column headers for the selected range
-    const headers = [];
-    for (let col = Math.min(startCol, endCol); col <= Math.max(startCol, endCol); col++) {
-      headers.push(columns[col].name);
-    }
+    const { headers, data } = selectedCells;
 
     // Create markdown table
     const markdownContent = [
       `| ${headers.join(" | ")} |`,
       `| ${headers.map(() => "---").join(" | ")} |`,
-      ...data.map((row) => `| ${row.map((cell) => formatCellValue(cell, this.options)).join(" | ")} |`),
+      ...data.map((row) => `| ${row.map((cell) => cell).join(" | ")} |`),
     ].join("\n");
 
     try {

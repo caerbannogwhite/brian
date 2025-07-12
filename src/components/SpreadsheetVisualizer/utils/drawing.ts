@@ -1,6 +1,7 @@
 import { getDefaultBorderColor, DEFAULT_BORDER_WIDTH } from "@/components/SpreadsheetVisualizer/defaults";
-import { Column, CellStyle, CellPosition, SpreadsheetOptions } from "../types";
-import { formatCellStyle } from "./cellFormatting";
+import { SpreadsheetOptions } from "../types";
+import { CellStyle, CellPosition, ColumnInternal } from "../internals";
+import { getFormattedValueAndStyle } from "./formatting";
 
 interface DrawingOptions extends SpreadsheetOptions {
   scrollY: number;
@@ -23,6 +24,7 @@ export function measureText(ctx: CanvasRenderingContext2D, text: string, style: 
   return metrics.width + (style.padding || 8) * 2 + padding;
 }
 
+// TODO: check if this is needed
 export function drawCell(
   ctx: CanvasRenderingContext2D,
   x: number,
@@ -30,15 +32,14 @@ export function drawCell(
   width: number,
   height: number,
   value: any,
-  style: CellStyle,
-  column: Column | undefined,
+  column: ColumnInternal | undefined,
   options: SpreadsheetOptions
 ): void {
   const borderColor = options.borderColor ?? getDefaultBorderColor();
   const borderWidth = options.borderWidth ?? DEFAULT_BORDER_WIDTH;
 
   // Draw cell background
-  ctx.fillStyle = style.backgroundColor || "#ffffff";
+  ctx.fillStyle = options.cellBackgroundColor || "#ffffff";
   ctx.fillRect(x, y, width, height);
 
   // Draw cell border
@@ -47,8 +48,8 @@ export function drawCell(
   ctx.strokeRect(x, y, width, height);
 
   // Format and style the cell value
-  const { text, style: typeStyle } = column ? formatCellStyle(value, column, options) : { text: value, style: {} };
-  const finalStyle = { ...style, ...typeStyle };
+  const { formatted, style } = column ? getFormattedValueAndStyle(value, column, options) : { formatted: value, style: {} };
+  const finalStyle = { ...style };
 
   // Draw text with monospaced font
   ctx.fillStyle = finalStyle.textColor || "#000000";
@@ -71,7 +72,7 @@ export function drawCell(
 
   // Draw text with vertical centering
   const textY = y + (height + (finalStyle.fontSize || 14)) / 2;
-  ctx.fillText(text, textX, textY);
+  ctx.fillText(formatted, textX, textY);
   ctx.restore();
 }
 

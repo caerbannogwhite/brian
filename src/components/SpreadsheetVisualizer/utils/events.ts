@@ -1,5 +1,7 @@
-import { CellPosition, SpreadsheetOptions } from "../types";
 import { DEFAULT_CELL_HEIGHT } from "@/components/SpreadsheetVisualizer/defaults";
+import { SpreadsheetOptions } from "../types";
+import { CellPosition } from "../internals";
+
 interface ExtendedSpreadsheetOptions extends SpreadsheetOptions {
   scrollY: number;
   scrollX: number;

@@ -30,14 +30,22 @@ import {
   DEFAULT_MAX_FORMAT_GUESS_LENGTH,
   DEFAULT_TEXT_ALIGN,
   DEFAULT_NA_TEXT,
+  DEFAULT_TRUE_TEXT,
+  DEFAULT_FALSE_TEXT,
+  DEFAULT_IMAGE_SMOOTHING_ENABLED,
+  DEFAULT_LETTER_SPACING,
+  DEFAULT_IMAGE_SMOOTHING_QUALITY,
+  DEFAULT_TEXT_RENDERING,
+  DEFAULT_DATETIME_LOCALE,
 } from "./defaults";
 import { listenForThemeChanges } from "./utils/theme";
 import { Column, SpreadsheetOptions, DataProvider } from "./types";
+import { ColumnInternal } from "./internals";
 import { minMax } from "./utils/drawing";
 import { throttle } from "./utils/throttle";
 import { ColumnStatsVisualizer } from "../ColumnStatsVisualizer/ColumnStatsVisualizer";
 import { ContextMenu } from "./ContextMenu";
-import { formatCellStyle, formatCellValue } from "./utils/cellFormatting";
+import { getFormattedValueAndStyle } from "./utils/formatting";
 
 type RequiredSpreadsheetOptions = Omit<Required<SpreadsheetOptions>, "height" | "width"> & {
   height: number;
@@ -72,7 +80,7 @@ export class SpreadsheetVisualizer {
   private selectionCtx: CanvasRenderingContext2D;
   private hoverCtx: CanvasRenderingContext2D;
   private dataProvider: DataProvider;
-  private columns: Column[];
+  private columns: ColumnInternal[];
   private totalRows: number;
   private totalCols: number;
   private options: RequiredSpreadsheetOptions;
@@ -173,6 +181,12 @@ export class SpreadsheetVisualizer {
       cellPadding: options.cellPadding ?? DEFAULT_CELL_PADDING,
       rowHeaderWidth: options.rowHeaderWidth ?? DEFAULT_ROW_HEADER_WIDTH,
 
+      // Rendering options
+      textRendering: options.textRendering ?? DEFAULT_TEXT_RENDERING,
+      letterSpacing: options.letterSpacing ?? DEFAULT_LETTER_SPACING,
+      imageSmoothingEnabled: options.imageSmoothingEnabled ?? DEFAULT_IMAGE_SMOOTHING_ENABLED,
+      imageSmoothingQuality: options.imageSmoothingQuality ?? DEFAULT_IMAGE_SMOOTHING_QUALITY,
+
       // Style options
       borderWidth: options.borderWidth ?? DEFAULT_BORDER_WIDTH,
       fontFamily: options.fontFamily ?? DEFAULT_FONT_FAMILY,
@@ -194,9 +208,12 @@ export class SpreadsheetVisualizer {
 
       dateFormat: options.dateFormat ?? DEFAULT_DATE_FORMAT,
       datetimeFormat: options.datetimeFormat ?? DEFAULT_DATETIME_FORMAT,
+      datetimeLocale: options.datetimeLocale ?? DEFAULT_DATETIME_LOCALE,
       numberFormat: options.numberFormat ?? DEFAULT_NUMBER_FORMAT,
 
       naText: options.naText ?? DEFAULT_NA_TEXT,
+      trueText: options.trueText ?? DEFAULT_TRUE_TEXT,
+      falseText: options.falseText ?? DEFAULT_FALSE_TEXT,
       textAlign: options.textAlign ?? DEFAULT_TEXT_ALIGN,
 
       maxFormatGuessLength: options.maxFormatGuessLength ?? DEFAULT_MAX_FORMAT_GUESS_LENGTH,
@@ -215,13 +232,13 @@ export class SpreadsheetVisualizer {
       this.statsVisualizer = statsVisualizer;
       // Update the data provider for the shared stats visualizer (no columns selected initially)
       // Note: Not awaiting since we're in constructor and no columns are selected yet
-      this.statsVisualizer.setDataProvider(dataProvider, []).catch(console.error);
+      this.statsVisualizer.setSpreadsheetVisualizer(this).catch(console.error);
     } else {
-      this.statsVisualizer = new ColumnStatsVisualizer(this.container, dataProvider, this.statsPanelWidth);
+      this.statsVisualizer = new ColumnStatsVisualizer(this.container, this, this.statsPanelWidth);
     }
 
     // Create context menu for export options
-    this.contextMenu = new ContextMenu(dataProvider, this.options, () => this.selectedCells);
+    this.contextMenu = new ContextMenu(this);
 
     // Setup theme change listener
     this.themeCleanup = listenForThemeChanges(() => {
@@ -232,23 +249,9 @@ export class SpreadsheetVisualizer {
     });
   }
 
-  private updateThemeColors(): void {
-    // Update colors based on current theme
-    this.options.headerBackgroundColor = getDefaultHeaderBackgroundColor();
-    this.options.headerTextColor = getDefaultHeaderTextColor();
-    this.options.cellBackgroundColor = getDefaultCellBackgroundColor();
-    this.options.cellTextColor = getDefaultCellTextColor();
-    this.options.borderColor = getDefaultBorderColor();
-    this.options.selectionColor = getDefaultSelectionColor();
-    this.options.hoverColor = getDefaultHoverColor();
-    this.options.scrollbarColor = getDefaultScrollbarColor();
-    this.options.scrollbarThumbColor = getDefaultScrollbarThumbColor();
-    this.options.scrollbarHoverColor = getDefaultScrollbarHoverColor();
-  }
-
   public async initialize() {
     const metadata = await this.dataProvider.getMetadata();
-    this.columns = metadata.columns;
+    this.columns = metadata.columns.map((col) => new ColumnInternal(col, this.options));
     this.totalRows = metadata.totalRows;
     this.totalCols = metadata.totalColumns;
 
@@ -266,7 +269,7 @@ export class SpreadsheetVisualizer {
   }
 
   public getSelectedColumns(): Column[] {
-    return this.selectedCols.map((colIndex) => this.columns[colIndex]).filter((col) => col !== undefined);
+    return this.selectedCols.map((colIndex) => this.columns[colIndex] as Column).filter((col) => col !== undefined);
   }
 
   public destroy(): void {
@@ -283,6 +286,59 @@ export class SpreadsheetVisualizer {
     if (this.statsVisualizer && !this.hasStatsPanel) {
       this.statsVisualizer.hide();
     }
+  }
+
+  public async getColumnValues(key: string): Promise<{ raw: any; formatted: string }[]> {
+    const metadata = await this.dataProvider.getMetadata();
+    const columnIndex = metadata.columns.findIndex((col) => col.key === key);
+    if (columnIndex === -1) return [];
+
+    const data = await this.dataProvider.fetchData(0, this.totalRows, columnIndex, columnIndex);
+    return data.flat().map((value) => getFormattedValueAndStyle(value, this.columns[columnIndex], this.options));
+  }
+
+  public async getSelectedFormattedValues(): Promise<{ headers: string[]; indeces: number[]; data: string[][] }> {
+    if (!this.selectedCells) return { headers: [], indeces: [], data: [] };
+
+    const { startRow, endRow, startCol, endCol } = this.selectedCells;
+    const data = await this.dataProvider.fetchData(
+      Math.min(startRow - 1, endRow - 1),
+      Math.max(startRow - 1, endRow - 1),
+      Math.min(startCol, endCol),
+      Math.max(startCol, endCol)
+    );
+
+    const formattedData = data.map((row) =>
+      row.map((cell, col) => getFormattedValueAndStyle(cell, this.columns[col + startCol], this.options).formatted)
+    );
+
+    // Get column headers for the selected range
+    const headers = [];
+    for (let col = Math.min(startCol, endCol); col <= Math.max(startCol, endCol); col++) {
+      headers.push(this.columns[col].name);
+    }
+
+    // Get row indeces for the selected range
+    const rowIndeces = [];
+    for (let row = Math.min(startRow, endRow); row <= Math.max(startRow, endRow); row++) {
+      rowIndeces.push(row);
+    }
+
+    return { headers, indeces: rowIndeces, data: formattedData };
+  }
+
+  private updateThemeColors(): void {
+    // Update colors based on current theme
+    this.options.headerBackgroundColor = getDefaultHeaderBackgroundColor();
+    this.options.headerTextColor = getDefaultHeaderTextColor();
+    this.options.cellBackgroundColor = getDefaultCellBackgroundColor();
+    this.options.cellTextColor = getDefaultCellTextColor();
+    this.options.borderColor = getDefaultBorderColor();
+    this.options.selectionColor = getDefaultSelectionColor();
+    this.options.hoverColor = getDefaultHoverColor();
+    this.options.scrollbarColor = getDefaultScrollbarColor();
+    this.options.scrollbarThumbColor = getDefaultScrollbarThumbColor();
+    this.options.scrollbarHoverColor = getDefaultScrollbarHoverColor();
   }
 
   private setupEventListeners() {
@@ -366,12 +422,13 @@ export class SpreadsheetVisualizer {
     await this.draw();
   }
 
-  private guessColumnWidths(values: any[][], col: Column, colIndex: number): number {
+  private guessColumnWidths(values: any[][], col: ColumnInternal, colIndex: number): number {
     const widths = [this.ctx.measureText(col.name).width + this.options.cellPadding * 2];
 
     for (const row of values) {
-      const text = formatCellValue(row[colIndex], this.options);
-      const width = this.ctx.measureText(text).width + this.options.cellPadding * 2;
+      const { formatted, style } = getFormattedValueAndStyle(row[colIndex], this.columns[colIndex], this.options);
+      this.ctx.textAlign = style.textAlign || this.options.textAlign;
+      const width = this.ctx.measureText(formatted).width + this.options.cellPadding * 2;
       widths.push(width);
     }
 
@@ -384,6 +441,13 @@ export class SpreadsheetVisualizer {
   }
 
   private async calculateColumnWidths() {
+    this.ctx.font = `${this.options.fontSize}px ${this.options.fontFamily}`;
+    this.ctx.textAlign = "left";
+    this.ctx.textRendering = this.options.textRendering ?? DEFAULT_TEXT_RENDERING;
+    this.ctx.letterSpacing = this.options.letterSpacing ?? DEFAULT_LETTER_SPACING;
+    this.ctx.imageSmoothingEnabled = this.options.imageSmoothingEnabled ?? DEFAULT_IMAGE_SMOOTHING_ENABLED;
+    this.ctx.imageSmoothingQuality = this.options.imageSmoothingQuality ?? DEFAULT_IMAGE_SMOOTHING_QUALITY;
+
     // Get all rows from the first to maxFormatGuessLength
     const rows = await this.dataProvider.fetchData(0, this.options.maxFormatGuessLength, 0, this.totalCols);
 
@@ -391,7 +455,8 @@ export class SpreadsheetVisualizer {
 
     // Calculate minimum widths based on content
     this.colWidths = this.columns.map((col, colIndex) => {
-      return this.guessColumnWidths(rows, col, colIndex);
+      col.widthPx = this.guessColumnWidths(rows, col, colIndex);
+      return col.widthPx;
     });
 
     // Calculate column offsets
@@ -440,6 +505,11 @@ export class SpreadsheetVisualizer {
     // Calculate visible area
     const visibleStartRow = Math.floor(this.scrollY / this.options.cellHeight);
     const visibleEndRow = Math.min(visibleStartRow + Math.ceil(height / this.options.cellHeight), this.totalRows);
+
+    this.ctx.textRendering = this.options.textRendering ?? DEFAULT_TEXT_RENDERING;
+    this.ctx.letterSpacing = this.options.letterSpacing ?? DEFAULT_LETTER_SPACING;
+    this.ctx.imageSmoothingEnabled = this.options.imageSmoothingEnabled ?? DEFAULT_IMAGE_SMOOTHING_ENABLED;
+    this.ctx.imageSmoothingQuality = this.options.imageSmoothingQuality ?? DEFAULT_IMAGE_SMOOTHING_QUALITY;
 
     switch (this.toDraw) {
       //@ts-ignore: if cells is selected, fall through to selection
@@ -899,22 +969,21 @@ export class SpreadsheetVisualizer {
         ctx.fillRect(x, y, cellWidth, this.options.cellHeight);
 
         // Draw cell text
-        ctx.fillStyle = this.options.cellTextColor;
-        const { text, style } = formatCellStyle(data[row][col], column, this.options);
-        const textX = x + this.options.cellPadding;
+        const { formatted, style } = getFormattedValueAndStyle(data[row][col], column, this.options);
         const textY = y + this.options.cellHeight / 2;
 
-        ctx.fillStyle = style.textColor || this.options.cellTextColor;
-        ctx.fillText(text, textX, textY);
+        let textX = x + this.options.cellPadding;
+        switch (style.textAlign) {
+          case "center":
+            textX = x + cellWidth / 2;
+            break;
+          case "right":
+            textX = x + cellWidth - this.options.cellPadding;
+        }
 
-        // Align text based on data type
-        // if (column.dataType === "number" || column.dataType === "date" || column.dataType === "datetime") {
-        //   ctx.textAlign = "right";
-        //   ctx.fillText(text, x + cellWidth - this.options.cellPadding, textY);
-        // } else {
-        //   ctx.textAlign = "left";
-        //   ctx.fillText(text, textX, textY);
-        // }
+        ctx.fillStyle = style.textColor || this.options.cellTextColor;
+        ctx.textAlign = style.textAlign || this.options.textAlign;
+        ctx.fillText(formatted, textX, textY);
 
         // Draw cell border
         ctx.strokeStyle = this.options.borderColor;

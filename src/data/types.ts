@@ -40,11 +40,15 @@ export function getColumns(dataset: CdiscDataset) {
   }));
 }
 
-function mapDataType(cdiscType: string): "string" | "number" | "date" | "datetime" | "boolean" | "null" {
+function mapDataType(cdiscType: string): "string" | "integer" | "float" | "date" | "datetime" | "boolean" | "null" {
   switch (cdiscType.toLowerCase()) {
     case "integer":
     case "decimal":
-      return "number";
+    case "float":
+      return "float";
+    case "int":
+    case "integer":
+      return "integer";
     case "date":
       return "date";
     case "datetime":

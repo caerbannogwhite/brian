@@ -1,5 +1,5 @@
+import { SpreadsheetVisualizer } from "../SpreadsheetVisualizer/SpreadsheetVisualizer";
 import { Column } from "../SpreadsheetVisualizer/types";
-import { DataProvider } from "../SpreadsheetVisualizer/types";
 
 interface ColumnStats {
   min?: number;
@@ -14,13 +14,13 @@ interface ColumnStats {
 
 export class ColumnStatsVisualizer {
   private container: HTMLElement;
-  private dataProvider: DataProvider | null;
+  private spreadsheetVisualizer: SpreadsheetVisualizer | null = null;
   private currentColumn: Column | null = null;
   private stats: ColumnStats | null = null;
 
-  constructor(parent: HTMLElement, dataProvider: DataProvider | null, statsPanelWidth: number) {
+  constructor(parent: HTMLElement, spreadsheetVisualizer: SpreadsheetVisualizer | null, statsPanelWidth: number) {
     this.container = document.createElement("div");
-    this.dataProvider = dataProvider;
+    this.spreadsheetVisualizer = spreadsheetVisualizer;
 
     this.container.id = "column-stats-container";
     this.container.style.width = `${statsPanelWidth}px`;
@@ -28,13 +28,13 @@ export class ColumnStatsVisualizer {
     parent.appendChild(this.container);
   }
 
-    public async setDataProvider(dataProvider: DataProvider, selectedColumns: Column[] = []) {
-    this.dataProvider = dataProvider;
-    
+  public async setSpreadsheetVisualizer(spreadsheetVisualizer: SpreadsheetVisualizer) {
+    this.spreadsheetVisualizer = spreadsheetVisualizer;
+
     // Handle the data provider change with the selected columns from the new dataset
-    if (selectedColumns.length > 0) {
+    if (this.spreadsheetVisualizer.getSelectedColumns().length > 0) {
       // Show stats for the first selected column (assuming single column selection mode)
-      await this.showStats(selectedColumns[0]);
+      await this.showStats(this.spreadsheetVisualizer.getSelectedColumns()[0]);
     } else {
       // No columns selected in the new dataset, hide the stats panel
       this.hide();
@@ -42,11 +42,6 @@ export class ColumnStatsVisualizer {
   }
 
   public async showStats(column: Column) {
-    if (!this.dataProvider) {
-      console.warn("No data provider set for ColumnStatsVisualizer");
-      return;
-    }
-
     this.currentColumn = column;
     this.container.style.display = "block";
     this.container.classList.add("visible");
@@ -62,27 +57,18 @@ export class ColumnStatsVisualizer {
   }
 
   private async calculateStats() {
-    if (!this.currentColumn || !this.dataProvider) return;
+    if (!this.currentColumn || !this.spreadsheetVisualizer) return;
 
-    const metadata = await this.dataProvider.getMetadata();
-
-    const totalRows = metadata.totalRows;
-    const columns = metadata.columns;
-    const columnIndex = columns.findIndex((col) => col.key === this.currentColumn!.key);
-
-    if (columnIndex === -1) return;
-
-    const data = await this.dataProvider.fetchData(0, totalRows, columnIndex, columnIndex);
-    const values = data.flat();
+    const values = await this.spreadsheetVisualizer.getColumnValues(this.currentColumn!.key);
 
     this.stats = {
       totalCount: values.length,
-      nullCount: values.filter((v) => v === null || v === undefined).length,
+      nullCount: values.filter((v) => v.raw === null).length,
       valueCounts: new Map<string, number>(),
     };
 
-    if (this.currentColumn.dataType === "number") {
-      const numbers = values.filter((v) => typeof v === "number") as number[];
+    if (this.currentColumn.dataType === "integer" || this.currentColumn.dataType === "float") {
+      const numbers = values.map((v) => Number(v.raw)).filter((v) => v !== null && !isNaN(v));
       if (numbers.length > 0) {
         this.stats.min = Math.min(...numbers);
         this.stats.max = Math.max(...numbers);
@@ -104,8 +90,8 @@ export class ColumnStatsVisualizer {
     } else {
       // For categorical data, count occurrences
       values.forEach((value) => {
-        if (value !== null && value !== undefined) {
-          const key = String(value);
+        if (value.raw !== null) {
+          const key = value.formatted;
           this.stats!.valueCounts!.set(key, (this.stats!.valueCounts!.get(key) || 0) + 1);
         }
       });
@@ -148,11 +134,11 @@ export class ColumnStatsVisualizer {
     `);
 
     // Numeric stats
-    if (this.currentColumn?.dataType === "number" && this.stats.min !== undefined) {
+    if (this.currentColumn?.dataType === "integer" || (this.currentColumn?.dataType === "float" && this.stats.min !== undefined)) {
       stats.push(`
         <div class="column-stats__item">
           <div class="column-stats__label">Min</div>
-          <div class="column-stats__value">${this.stats.min.toLocaleString(undefined, {
+          <div class="column-stats__value">${this.stats.min!.toLocaleString(undefined, {
             minimumFractionDigits: 2,
             maximumFractionDigits: 2,
           })}</div>
@@ -195,7 +181,7 @@ export class ColumnStatsVisualizer {
     if (!this.stats || !this.stats.valueCounts) return "";
 
     // For categorical data, show horizontal histogram of top 10 values
-    if (this.currentColumn?.dataType !== "number") {
+    if (this.currentColumn?.dataType !== "integer" && this.currentColumn?.dataType !== "float") {
       const sortedCounts = Array.from(this.stats.valueCounts.entries()).sort((a, b) => b[1] - a[1]);
       const top10 = sortedCounts.slice(0, 10);
 

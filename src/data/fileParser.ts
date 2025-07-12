@@ -20,23 +20,23 @@ export interface ParseResult {
  */
 export async function parseFile(file: File, options: ParseOptions = {}): Promise<ParseResult> {
   const { delimiter, hasHeader = true, fileName } = options;
-  
+
   // Read file content
   const content = await readFileAsText(file);
-  
+
   // Determine delimiter if not provided
   const detectedDelimiter = delimiter || detectDelimiter(content);
-  
+
   // Parse CSV content
   const { headers, rows } = parseCSV(content, detectedDelimiter, hasHeader);
-  
+
   // Infer column types from data
   const columns = inferColumns(headers, rows);
-  
+
   // Generate dataset metadata
   const now = new Date().toISOString();
   const datasetName = (fileName || file.name).replace(/\.[^/.]+$/, "").toUpperCase();
-  
+
   const dataset: CdiscDataset = {
     datasetJSONCreationDateTime: now,
     datasetJSONVersion: "1.0.0",
@@ -45,17 +45,20 @@ export async function parseFile(file: File, options: ParseOptions = {}): Promise
     originator: "Brian File Parser",
     sourceSystem: {
       name: "Brian",
-      version: "0.3.0"
+      version: "0.3.0",
     },
     studyOID: "STUDY_IMPORTED",
-    metaDataVersionOID: "MDV_IMPORTED", 
+    metaDataVersionOID: "MDV_IMPORTED",
     metaDataRef: "metadata_imported.json",
     itemGroupOID: `IG.${datasetName}`,
     records: rows.length,
     name: datasetName,
-    label: datasetName.toLowerCase().replace(/[_-]/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+    label: datasetName
+      .toLowerCase()
+      .replace(/[_-]/g, " ")
+      .replace(/\b\w/g, (l) => l.toUpperCase()),
     columns,
-    rows
+    rows,
   };
 
   return {
@@ -63,8 +66,8 @@ export async function parseFile(file: File, options: ParseOptions = {}): Promise
     parseInfo: {
       rowCount: rows.length,
       columnCount: columns.length,
-      fileName: file.name
-    }
+      fileName: file.name,
+    },
   };
 }
 
@@ -75,8 +78,8 @@ function readFileAsText(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = (e) => resolve(e.target?.result as string);
-    reader.onerror = (e) => reject(new Error('Failed to read file'));
-    reader.readAsText(file, 'utf-8');
+    reader.onerror = () => reject(new Error("Failed to read file"));
+    reader.readAsText(file, "utf-8");
   });
 }
 
@@ -84,37 +87,35 @@ function readFileAsText(file: File): Promise<string> {
  * Detect CSV delimiter by checking common separators
  */
 function detectDelimiter(content: string): string {
-  const delimiters = [',', '\t', ';', '|'];
-  const firstLine = content.split('\n')[0] || '';
-  
+  const delimiters = [",", "\t", ";", "|"];
+  const firstLine = content.split("\n")[0] || "";
+
   // Count occurrences of each delimiter
-  const counts = delimiters.map(delimiter => ({
+  const counts = delimiters.map((delimiter) => ({
     delimiter,
-    count: (firstLine.match(new RegExp(`\\${delimiter}`, 'g')) || []).length
+    count: (firstLine.match(new RegExp(`\\${delimiter}`, "g")) || []).length,
   }));
-  
+
   // Return the delimiter with the highest count
-  const best = counts.reduce((max, current) => 
-    current.count > max.count ? current : max
-  );
-  
-  return best.count > 0 ? best.delimiter : ',';
+  const best = counts.reduce((max, current) => (current.count > max.count ? current : max));
+
+  return best.count > 0 ? best.delimiter : ",";
 }
 
 /**
  * Parse CSV content into headers and rows
  */
-function parseCSV(content: string, delimiter: string, hasHeader: boolean): { headers: string[], rows: any[][] } {
-  const lines = content.split('\n').filter(line => line.trim().length > 0);
-  
+function parseCSV(content: string, delimiter: string, hasHeader: boolean): { headers: string[]; rows: any[][] } {
+  const lines = content.split("\n").filter((line) => line.trim().length > 0);
+
   if (lines.length === 0) {
-    throw new Error('File is empty');
+    throw new Error("File is empty");
   }
-  
+
   // Parse first line as headers or generate them
   let headers: string[];
   let dataStartIndex: number;
-  
+
   if (hasHeader) {
     headers = parseCSVLine(lines[0], delimiter);
     dataStartIndex = 1;
@@ -124,21 +125,21 @@ function parseCSV(content: string, delimiter: string, hasHeader: boolean): { hea
     headers = firstRowColumns.map((_, index) => `Column${index + 1}`);
     dataStartIndex = 0;
   }
-  
+
   // Parse data rows
   const rows: any[][] = [];
   for (let i = dataStartIndex; i < lines.length; i++) {
     const row = parseCSVLine(lines[i], delimiter);
     // Ensure row has same length as headers
     while (row.length < headers.length) {
-      row.push('');
+      row.push("");
     }
     if (row.length > headers.length) {
       row.splice(headers.length);
     }
     rows.push(row);
   }
-  
+
   return { headers, rows };
 }
 
@@ -147,13 +148,13 @@ function parseCSV(content: string, delimiter: string, hasHeader: boolean): { hea
  */
 function parseCSVLine(line: string, delimiter: string): string[] {
   const result: string[] = [];
-  let current = '';
+  let current = "";
   let inQuotes = false;
-  
+
   for (let i = 0; i < line.length; i++) {
     const char = line[i];
     const nextChar = line[i + 1];
-    
+
     if (char === '"') {
       if (inQuotes && nextChar === '"') {
         // Escaped quote
@@ -166,15 +167,15 @@ function parseCSVLine(line: string, delimiter: string): string[] {
     } else if (char === delimiter && !inQuotes) {
       // Field separator
       result.push(current.trim());
-      current = '';
+      current = "";
     } else {
       current += char;
     }
   }
-  
+
   // Add last field
   result.push(current.trim());
-  
+
   return result;
 }
 
@@ -183,17 +184,20 @@ function parseCSVLine(line: string, delimiter: string): string[] {
  */
 function inferColumns(headers: string[], rows: any[][]): CdiscColumn[] {
   return headers.map((header, index) => {
-    const values = rows.map(row => row[index]).filter(val => val !== null && val !== undefined && val !== '');
+    const values = rows.map((row) => row[index]).filter((val) => val !== null && val !== undefined && val !== "");
     const dataType = inferDataType(values);
-    const maxLength = Math.max(...values.map(val => String(val || '').length));
-    
+    const maxLength = Math.max(...values.map((val) => String(val || "").length));
+
     return {
       itemOID: `${header.toUpperCase()}.${header.toUpperCase()}`,
       name: header.toUpperCase(),
-      label: header.toLowerCase().replace(/[_-]/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+      label: header
+        .toLowerCase()
+        .replace(/[_-]/g, " ")
+        .replace(/\b\w/g, (l) => l.toUpperCase()),
       dataType,
       length: Math.max(maxLength, 8),
-      keySequence: index === 0 ? 1 : undefined // Make first column a key
+      keySequence: index === 0 ? 1 : undefined, // Make first column a key
     };
   });
 }
@@ -202,50 +206,50 @@ function inferColumns(headers: string[], rows: any[][]): CdiscColumn[] {
  * Infer data type from sample values
  */
 function inferDataType(values: any[]): string {
-  if (values.length === 0) return 'string';
-  
+  if (values.length === 0) return "string";
+
   // Sample first 100 values for performance
   const sample = values.slice(0, 100);
-  
+
   let numericCount = 0;
   let dateCount = 0;
   let booleanCount = 0;
-  
+
   for (const value of sample) {
     const str = String(value).trim().toLowerCase();
-    
+
     // Check for boolean
-    if (str === 'true' || str === 'false' || str === 'yes' || str === 'no' || str === '1' || str === '0') {
+    if (str === "true" || str === "false" || str === "yes" || str === "no" || str === "1" || str === "0") {
       booleanCount++;
     }
-    
+
     // Check for number
-    if (!isNaN(Number(str)) && str !== '') {
+    if (!isNaN(Number(str)) && str !== "") {
       numericCount++;
     }
-    
+
     // Check for date
     if (isValidDate(str)) {
       dateCount++;
     }
   }
-  
+
   const total = sample.length;
   const threshold = 0.8; // 80% threshold
-  
+
   if (numericCount / total >= threshold) {
-    return Number.isInteger(Number(sample[0])) ? 'integer' : 'decimal';
+    return Number.isInteger(Number(sample[0])) ? "integer" : "decimal";
   }
-  
+
   if (dateCount / total >= threshold) {
-    return hasTimeComponent(sample) ? 'datetime' : 'date';
+    return hasTimeComponent(sample) ? "datetime" : "date";
   }
-  
+
   if (booleanCount / total >= threshold) {
-    return 'boolean';
+    return "boolean";
   }
-  
-  return 'string';
+
+  return "string";
 }
 
 /**
@@ -253,7 +257,7 @@ function inferDataType(values: any[]): string {
  */
 function isValidDate(str: string): boolean {
   if (!str || str.length < 8) return false;
-  
+
   const date = new Date(str);
   return !isNaN(date.getTime()) && str.match(/\d{4}/) !== null;
 }
@@ -264,7 +268,7 @@ function isValidDate(str: string): boolean {
 function hasTimeComponent(values: any[]): boolean {
   for (const value of values.slice(0, 10)) {
     const str = String(value).trim();
-    if (str.includes(':') || str.includes('T')) {
+    if (str.includes(":") || str.includes("T")) {
       return true;
     }
   }
@@ -283,15 +287,7 @@ function generateFileOID(name: string): string {
  * Get supported file types for drag and drop
  */
 export function getSupportedFileTypes(): string[] {
-  return [
-    'text/csv',
-    'text/tab-separated-values',
-    'text/plain',
-    'application/csv',
-    '.csv',
-    '.tsv',
-    '.txt'
-  ];
+  return ["text/csv", "text/tab-separated-values", "text/plain", "application/csv", ".csv", ".tsv", ".txt"];
 }
 
 /**
@@ -301,9 +297,6 @@ export function isSupportedFileType(file: File): boolean {
   const supportedTypes = getSupportedFileTypes();
   const fileType = file.type.toLowerCase();
   const fileName = file.name.toLowerCase();
-  
-  return supportedTypes.some(type => 
-    fileType.includes(type.replace('.', '')) || 
-    fileName.endsWith(type)
-  );
-} 
+
+  return supportedTypes.some((type) => fileType.includes(type.replace(".", "")) || fileName.endsWith(type));
+}

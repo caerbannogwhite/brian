@@ -1,8 +1,10 @@
+export type DataType = "null" | "boolean" | "integer" | "float" | "string" | "date" | "datetime";
+
 export interface Column {
   name: string;
   key: string;
   label?: string;
-  dataType: "string" | "number" | "date" | "datetime" | "boolean" | "null";
+  dataType: DataType;
   length?: number;
   format?: string | Intl.NumberFormatOptions;
 }
@@ -15,19 +17,10 @@ export interface DatasetMetadata {
   totalColumns: number;
   columns: Column[];
 }
-
-export interface CellStyle {
-  backgroundColor?: string;
-  textColor?: string;
-  fontSize?: number;
-  fontFamily?: string;
-  textAlign?: "left" | "center" | "right";
-  padding?: number;
-  numericColor?: string;
-  dateColor?: string;
-  nullColor?: string;
+export interface DataProvider {
+  getMetadata(): Promise<DatasetMetadata>;
+  fetchData(startRow: number, endRow: number, startCol: number, endCol: number): Promise<any[][]>;
 }
-
 export interface SpreadsheetOptions {
   // Viewport options
   maxHeight?: number;
@@ -43,6 +36,12 @@ export interface SpreadsheetOptions {
   maxCellWidth?: number;
   cellPadding?: number;
   rowHeaderWidth?: number;
+
+  // Rendering options
+  textRendering?: "auto" | "geometricPrecision";
+  letterSpacing?: string;
+  imageSmoothingEnabled?: boolean;
+  imageSmoothingQuality?: "low" | "medium" | "high";
 
   // Style options
   borderWidth?: number;
@@ -64,59 +63,15 @@ export interface SpreadsheetOptions {
   scrollbarHoverColor?: string;
 
   naText?: string;
+  trueText?: string;
+  falseText?: string;
   textAlign?: "left" | "center" | "right";
 
   numberFormat?: Intl.NumberFormatOptions;
   dateFormat?: string;
   datetimeFormat?: string;
+  datetimeLocale?: Intl.Locale;
 
   maxFormatGuessLength?: number;
   percentFormatGuessFit?: number;
-}
-
-export interface DataProvider {
-  getMetadata(): Promise<DatasetMetadata>;
-  fetchData(startRow: number, endRow: number, startCol: number, endCol: number): Promise<any[][]>;
-}
-
-export interface CellPosition {
-  row: number;
-  col: number;
-}
-
-export interface ScrollbarState {
-  isHoveringVertical: boolean;
-  isHoveringHorizontal: boolean;
-  isDraggingVertical: boolean;
-  isDraggingHorizontal: boolean;
-  lastMouseY: number;
-  lastMouseX: number;
-}
-
-export interface SelectionState {
-  isSelecting: boolean;
-  start: CellPosition | null;
-  end: CellPosition | null;
-  color: string;
-  borderColor: string;
-}
-
-export interface HoverState {
-  cell: CellPosition | null;
-  color: string;
-  borderColor: string;
-}
-
-export interface ScrollState {
-  scrollY: number;
-  scrollX: number;
-  totalRows: number;
-  totalColumns: number;
-  visibleRows: number;
-  visibleColumns: number;
-  rowBuffer: number;
-  dataCache: Map<number, any[]>;
-  isFetching: boolean;
-  lastFetchStart: number;
-  lastFetchEnd: number;
 }
