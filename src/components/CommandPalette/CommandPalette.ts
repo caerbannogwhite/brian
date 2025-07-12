@@ -197,6 +197,9 @@ export class CommandPalette {
   }
 
   private handleKeyDown(e: KeyboardEvent): void {
+    e.preventDefault();
+    e.stopPropagation();
+
     switch (e.key) {
       case "ArrowDown":
         e.preventDefault();

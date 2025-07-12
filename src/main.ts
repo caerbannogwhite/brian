@@ -1,5 +1,5 @@
 import "./styles/main.scss";
-import { datasetDm, datasetAe } from "./data.ts";
+import { datasetDm, datasetAe, datasetDmMini, datasetDmShort } from "./data.ts";
 import { BrianApp } from "./components/BrianApp";
 import { type CdiscDataset } from "./data/types";
 
@@ -8,11 +8,11 @@ async function initApplication() {
   const appContainer = document.getElementById("app") || document.body;
 
   // Clear existing content
-  appContainer.innerHTML = '';
+  appContainer.innerHTML = "";
 
   // Create the Brian application
   const brianApp = new BrianApp(appContainer, {
-    theme: 'auto', // Automatically detect user's preferred theme
+    theme: "auto", // Automatically detect user's preferred theme
     showDatasetPanel: true,
     statusBarVisible: true,
     commandPaletteEnabled: true,
@@ -22,17 +22,19 @@ async function initApplication() {
       dateFormat: "yyyy-MM-dd",
       datetimeFormat: "yyyy-MM-dd HH:mm:ss",
       numberFormat: { minimumFractionDigits: 2, maximumFractionDigits: 2 },
-    }
+    },
   });
 
   // Option to load sample datasets for development
   const loadSampleData = true; // Set to true to load sample datasets
-  
+
   if (loadSampleData) {
     try {
       await brianApp.addDataset("dm", "Demographics", datasetDm as CdiscDataset);
+      await brianApp.addDataset("dmMini", "Demographics Mini", datasetDmMini as CdiscDataset);
+      await brianApp.addDataset("dmShort", "Demographics Short", datasetDmShort as CdiscDataset);
       await brianApp.addDataset("ae", "Adverse Events", datasetAe as CdiscDataset);
-      
+
       brianApp.showMessage("Sample datasets loaded successfully", "info");
     } catch (error) {
       console.error("Error loading datasets:", error);

@@ -487,11 +487,13 @@ export class SpreadsheetVisualizer {
     const hasScrollbar = minTotalHeight > availableHeight;
 
     this.totalHeight = this.totalRows * this.options.cellHeight;
-    this.totalScrollY =
+    this.totalScrollY = Math.max(
+      0,
       this.totalHeight -
-      this.canvas.height +
-      this.options.cellHeight * 2 + // header
-      (hasScrollbar ? this.options.scrollbarWidth : 0);
+        this.canvas.height +
+        this.options.cellHeight * 2 + // header
+        (hasScrollbar ? this.options.scrollbarWidth : 0)
+    );
   }
 
   private updateToDraw(newToDraw: ToDraw) {
@@ -709,23 +711,25 @@ export class SpreadsheetVisualizer {
 
     // Zoom
     if (event.ctrlKey) {
-      // TODO: implement zoom
-      // const zoomFactor = event.deltaY > 0 ? 0.9 : 1.1;
-      // this.options.fontSize = Math.max(8, Math.min(24, this.options.fontSize * zoomFactor));
-      // this.options.headerFontSize = Math.max(8, Math.min(24, this.options.headerFontSize * zoomFactor));
-      // this.calculateColumnWidths();
-      // this.updateToDraw(ToDraw.Cells);
+      const zoomFactor = event.deltaY > 0 ? 0.9 : 1.1;
+
+      this.options.fontSize = Math.max(14, Math.min(24, this.options.fontSize * zoomFactor));
+      this.options.cellHeight = Math.max(14, Math.min(24, this.options.cellHeight * zoomFactor));
+      this.options.headerFontSize = Math.max(14, Math.min(24, this.options.headerFontSize * zoomFactor));
+      this.options.cellPadding = Math.max(1, Math.min(10, this.options.cellPadding * zoomFactor));
+
+      this.calculateColumnWidths();
+      this.updateToDraw(ToDraw.Cells);
     }
 
     // Scroll
     else {
       const prevScrollY = this.scrollY;
-      const prevScrollX = this.scrollX;
-
+      // const prevScrollX = this.scrollX;
       this.scrollY = minMax(this.scrollY + event.deltaY, 0, this.totalScrollY);
-      this.scrollX = minMax(this.scrollX + event.deltaX, 0, this.totalScrollX);
+      // this.scrollX = minMax(this.scrollX + event.deltaX, 0, this.totalScrollX);
 
-      if (prevScrollY !== this.scrollY || prevScrollX !== this.scrollX) {
+      if (prevScrollY !== this.scrollY) {
         this.updateToDraw(ToDraw.Cells);
       }
     }
@@ -820,10 +824,18 @@ export class SpreadsheetVisualizer {
         }
         break;
 
+      // Copy
       case "c":
+      case "C":
         if (event.ctrlKey || event.metaKey) {
           this.contextMenu.exportAsCSV();
         }
+        break;
+
+      // Cancel selection
+      case "Escape":
+        this.selectedCells = null;
+        this.updateToDraw(ToDraw.Selection);
         break;
     }
 
@@ -1058,7 +1070,7 @@ export class SpreadsheetVisualizer {
     if (this.hoveredCell) {
       const { col } = this.hoveredCell;
 
-      const height = this.hoverCanvas.height - this.options.scrollbarWidth;
+      const height = Math.min(this.options.cellHeight + this.totalHeight, this.hoverCanvas.height - this.options.scrollbarWidth);
 
       let x = this.colOffsets[col] - this.scrollX;
       let width = this.colWidths[col];
@@ -1139,7 +1151,7 @@ export class SpreadsheetVisualizer {
     this.selectionCtx.fillStyle = this.options.selectionColor;
     this.selectionCtx.strokeStyle = this.options.borderColor;
 
-    const height = this.selectionCanvas.height - this.options.scrollbarWidth;
+    const height = Math.min(this.options.cellHeight + this.totalHeight, this.selectionCanvas.height - this.options.scrollbarWidth);
     this.selectedCols.forEach((col) => {
       // Skip if the column is not visible
       if (this.colOffsets[col + 1] - this.scrollX < this.options.rowHeaderWidth) return;
