@@ -7,6 +7,7 @@ export { ColumnStatsVisualizer } from "./components/ColumnStatsVisualizer/Column
 export { StatusBar } from "./components/StatusBar";
 export { CommandPalette } from "./components/CommandPalette";
 export { DragDropZone } from "./components/DragDropZone";
+export { CellValueBar } from "./components/CellValueBar";
 
 // Data types and utilities
 export type { CdiscDataset, CdiscColumn } from "./data/types";
@@ -18,6 +19,7 @@ export type { BrianAppOptions } from "./components/BrianApp";
 export type { StatusBarItem } from "./components/StatusBar";
 export type { Command } from "./components/CommandPalette";
 export type { DragDropZoneOptions } from "./components/DragDropZone";
+export type { CellValueBarOptions, CellInfo } from "./components/CellValueBar";
 
 // File parsing utilities
 export { parseFile, isSupportedFileType, getSupportedFileTypes } from "./data/fileParser";

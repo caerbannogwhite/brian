@@ -121,6 +121,9 @@ export class SpreadsheetVisualizer {
   // Theme management
   private themeCleanup: (() => void) | null = null;
 
+  // Selection change callback
+  private onSelectionChange?: (cell: { row: number; col: number; value: any; column: ColumnInternal } | null) => void;
+
   constructor(
     container: HTMLElement,
     dataProvider: DataProvider,
@@ -270,6 +273,10 @@ export class SpreadsheetVisualizer {
 
   public getSelectedColumns(): Column[] {
     return this.selectedCols.map((colIndex) => this.columns[colIndex] as Column).filter((col) => col !== undefined);
+  }
+
+  public setOnSelectionChange(callback: (cell: { row: number; col: number; value: any; column: ColumnInternal } | null) => void): void {
+    this.onSelectionChange = callback;
   }
 
   public destroy(): void {
@@ -630,6 +637,7 @@ export class SpreadsheetVisualizer {
         };
 
         this.updateToDraw(ToDraw.Selection);
+        this.notifySelectionChange();
       }
     }
 
@@ -670,6 +678,7 @@ export class SpreadsheetVisualizer {
             this.selectedCells.endCol = newHoverCell.col;
 
             this.updateToDraw(ToDraw.Selection);
+            this.notifySelectionChange();
           }
         }
         break;
@@ -765,6 +774,7 @@ export class SpreadsheetVisualizer {
         } else {
           this.updateToDraw(ToDraw.Selection);
         }
+        this.notifySelectionChange();
         break;
 
       case "ArrowDown":
@@ -784,6 +794,7 @@ export class SpreadsheetVisualizer {
         } else {
           this.updateToDraw(ToDraw.Selection);
         }
+        this.notifySelectionChange();
         break;
 
       case "ArrowLeft":
@@ -803,6 +814,7 @@ export class SpreadsheetVisualizer {
         } else {
           this.updateToDraw(ToDraw.Selection);
         }
+        this.notifySelectionChange();
         break;
 
       case "ArrowRight":
@@ -822,6 +834,7 @@ export class SpreadsheetVisualizer {
         } else {
           this.updateToDraw(ToDraw.Selection);
         }
+        this.notifySelectionChange();
         break;
 
       // Copy
@@ -836,6 +849,7 @@ export class SpreadsheetVisualizer {
       case "Escape":
         this.selectedCells = null;
         this.updateToDraw(ToDraw.Selection);
+        this.notifySelectionChange();
         break;
     }
 
@@ -1231,6 +1245,40 @@ export class SpreadsheetVisualizer {
         scrollbarWidth - (hasVerticalScrollbar ? this.options.scrollbarWidth : 0),
         this.options.scrollbarWidth
       );
+    }
+  }
+
+  private async notifySelectionChange(): Promise<void> {
+    if (!this.onSelectionChange) return;
+
+    if (!this.selectedCells) {
+      this.onSelectionChange(null);
+      return;
+    }
+
+    // For now, only handle single cell selection (start cell)
+    const { startRow, startCol } = this.selectedCells;
+
+    try {
+      // TODO: Don't fetch the cell data, use the current data
+      // Fetch the cell data
+      const data = await this.dataProvider.fetchData(startRow - 1, startRow - 1, startCol, startCol);
+      const cellValue = data[0] && data[0][0];
+      const column = this.columns[startCol];
+
+      const { formatted } = getFormattedValueAndStyle(cellValue, column, this.options);
+
+      if (column) {
+        this.onSelectionChange({
+          row: startRow,
+          col: startCol,
+          value: formatted,
+          column,
+        });
+      }
+    } catch (error) {
+      console.error("Failed to fetch cell data for selection:", error);
+      this.onSelectionChange(null);
     }
   }
 }

@@ -1,0 +1,95 @@
+.cell-value-bar {
+  display: flex;
+  align-items: center;
+  height: 32px;
+  background-color: var(--vscode-input-background);
+  border-bottom: 1px solid var(--vscode-input-border);
+  font-family: var(--vscode-editor-font-family);
+  font-size: 13px;
+  color: var(--vscode-foreground);
+  padding: 0 8px;
+  gap: 12px;
+  flex-shrink: 0;
+
+  &__position {
+    width: 60px;
+    font-family: var(--vscode-editor-font-family);
+    font-weight: 500;
+    text-align: center;
+    color: var(--vscode-descriptionForeground);
+    background-color: var(--vscode-badge-background);
+    padding: 2px 6px;
+    border-radius: 3px;
+    flex-shrink: 0;
+  }
+
+  &__value {
+    flex: 1;
+    font-family: var(--vscode-editor-font-family);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+
+    &--number {
+      color: var(--vscode-debugTokenExpression-number);
+    }
+
+    &--date {
+      color: var(--vscode-debugTokenExpression-string);
+    }
+
+    &--boolean {
+      color: var(--vscode-debugTokenExpression-boolean);
+    }
+
+    &--null {
+      color: var(--vscode-descriptionForeground);
+      font-style: italic;
+    }
+  }
+}
+
+// Light theme adjustments
+@media (prefers-color-scheme: light) {
+  .cell-value-bar {
+    &__position {
+      background-color: #f3f3f3;
+    }
+
+    &__value {
+      &--number {
+        color: #098658;
+      }
+
+      &--date {
+        color: #a31515;
+      }
+
+      &--boolean {
+        color: #0000ff;
+      }
+
+      &--null {
+        color: #6a6a6a;
+      }
+    }
+  }
+}
+
+// Mobile responsive
+@media (max-width: 768px) {
+  .cell-value-bar {
+    padding: 0 4px;
+    gap: 8px;
+
+    &__position {
+      width: 50px;
+      font-size: 12px;
+    }
+
+    &__value {
+      font-size: 12px;
+    }
+  }
+}

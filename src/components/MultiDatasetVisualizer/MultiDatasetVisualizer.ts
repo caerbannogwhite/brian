@@ -3,6 +3,7 @@ import { DataProvider } from "../SpreadsheetVisualizer/types";
 import { SpreadsheetOptions } from "../SpreadsheetVisualizer/types";
 import { ColumnStatsVisualizer } from "../ColumnStatsVisualizer/ColumnStatsVisualizer";
 import { DragDropZone } from "../DragDropZone";
+import { CellValueBar } from "../CellValueBar";
 import { CdiscDataset } from "../../data/types";
 
 interface DatasetTab {
@@ -17,12 +18,14 @@ interface DatasetTab {
 export class MultiDatasetVisualizer {
   private container: HTMLElement;
   private tabsContainer: HTMLElement;
+  private cellValueBarContainer: HTMLElement;
   private contentContainer: HTMLElement;
   private tabs: DatasetTab[] = [];
   private activeTabId: string | null = null;
   private options: SpreadsheetOptions;
   private sharedStatsVisualizer: ColumnStatsVisualizer;
   private dragDropZone: DragDropZone | null = null;
+  private cellValueBar: CellValueBar | null = null;
   private onFileDropped?: (dataset: CdiscDataset, fileName: string) => void;
 
   constructor(parent: HTMLElement, options: SpreadsheetOptions = {}) {
@@ -42,11 +45,16 @@ export class MultiDatasetVisualizer {
     this.tabsContainer = document.createElement("div");
     this.tabsContainer.className = "multi-dataset-visualizer__tabs-container";
 
+    // Create cell value bar container
+    this.cellValueBarContainer = document.createElement("div");
+    this.cellValueBarContainer.className = "multi-dataset-visualizer__cell-value-bar-container";
+
     // Create content container
     this.contentContainer = document.createElement("div");
     this.contentContainer.className = "multi-dataset-visualizer__content-container";
 
     this.container.appendChild(this.tabsContainer);
+    this.container.appendChild(this.cellValueBarContainer);
     this.container.appendChild(this.contentContainer);
     parent.appendChild(this.container);
 
@@ -72,17 +80,19 @@ export class MultiDatasetVisualizer {
     // Force layout calculation to get accurate dimensions
     this.container.offsetHeight;
     this.tabsContainer.offsetHeight;
+    this.cellValueBarContainer.offsetHeight;
     this.contentContainer.offsetHeight;
 
     // Calculate actual available dimensions based on container size
     const containerWidth = this.container.clientWidth;
     const containerHeight = this.container.clientHeight;
     const tabsHeight = this.tabsContainer.offsetHeight || 40;
+    const cellValueBarHeight = this.cellValueBarContainer.offsetHeight || 32;
 
     // Calculate dimensions that will fill the available space
     const availableWidth = containerWidth > 0 ? containerWidth : this.options.width;
     const availableHeight =
-      containerHeight > 0 ? containerHeight - tabsHeight : this.options.height ? this.options.height - tabsHeight : undefined;
+      containerHeight > 0 ? containerHeight - tabsHeight - cellValueBarHeight : this.options.height ? this.options.height - tabsHeight - cellValueBarHeight : undefined;
 
     // Create options for the spreadsheet with calculated dimensions
     const spreadsheetOptions = {
@@ -96,6 +106,15 @@ export class MultiDatasetVisualizer {
 
     // Create spreadsheet visualizer for this dataset with shared stats visualizer
     const spreadsheetVisualizer = new SpreadsheetVisualizer(datasetContainer, dataProvider, spreadsheetOptions, this.sharedStatsVisualizer);
+
+    // Connect selection change to cell value bar
+    spreadsheetVisualizer.setOnSelectionChange((cell) => {
+      if (this.cellValueBar && cell) {
+        this.cellValueBar.updateCell(cell);
+      } else if (this.cellValueBar) {
+        this.cellValueBar.updateCell(null);
+      }
+    });
 
     const tab: DatasetTab = {
       id,
@@ -115,6 +134,7 @@ export class MultiDatasetVisualizer {
     // If this is the first tab, activate it and hide empty state
     if (this.tabs.length === 1) {
       this.hideEmptyState();
+      this.showCellValueBar();
       await this.activateTab(id);
     }
   }
@@ -154,6 +174,8 @@ export class MultiDatasetVisualizer {
         this.contentContainer.innerHTML = "";
         // Hide stats visualizer when no datasets are active
         this.sharedStatsVisualizer.hide();
+        // Hide cell value bar when no datasets remain
+        this.hideCellValueBar();
         // Show empty state when no datasets remain
         this.showEmptyState();
       }
@@ -289,6 +311,12 @@ export class MultiDatasetVisualizer {
       this.dragDropZone.destroy();
       this.dragDropZone = null;
     }
+    
+    // Clean up cell value bar
+    if (this.cellValueBar) {
+      this.cellValueBar.destroy();
+      this.cellValueBar = null;
+    }
   }
 
   private showEmptyState(): void {
@@ -312,6 +340,21 @@ export class MultiDatasetVisualizer {
   private hideEmptyState(): void {
     if (this.dragDropZone) {
       this.dragDropZone.hide();
+    }
+  }
+
+  private showCellValueBar(): void {
+    if (this.cellValueBar) return;
+
+    this.cellValueBar = new CellValueBar({
+      container: this.cellValueBarContainer
+    });
+  }
+
+  private hideCellValueBar(): void {
+    if (this.cellValueBar) {
+      this.cellValueBar.destroy();
+      this.cellValueBar = null;
     }
   }
 }

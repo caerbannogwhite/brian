@@ -29,6 +29,11 @@
     }
   }
 
+  &__cell-value-bar-container {
+    min-height: 32px;
+    flex-shrink: 0;
+  }
+
   &__content-container {
     flex: 1;
     overflow: hidden;
