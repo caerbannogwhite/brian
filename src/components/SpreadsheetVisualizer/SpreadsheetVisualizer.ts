@@ -21,7 +21,9 @@ import {
   getDefaultCellTextColor,
   getDefaultBorderColor,
   getDefaultSelectionColor,
+  getDefaultSelectionBorderColor,
   getDefaultHoverColor,
+  getDefaultHoverBorderColor,
   getDefaultScrollbarColor,
   getDefaultScrollbarThumbColor,
   getDefaultScrollbarHoverColor,
@@ -201,7 +203,9 @@ export class SpreadsheetVisualizer {
       cellTextColor: options.cellTextColor ?? getDefaultCellTextColor(),
       borderColor: options.borderColor ?? getDefaultBorderColor(),
       selectionColor: options.selectionColor ?? getDefaultSelectionColor(),
+      selectionBorderColor: options.selectionBorderColor ?? getDefaultSelectionBorderColor(),
       hoverColor: options.hoverColor ?? getDefaultHoverColor(),
+      hoverBorderColor: options.hoverBorderColor ?? getDefaultHoverBorderColor(),
 
       // Scrollbar options
       scrollbarWidth: options.scrollbarWidth ?? DEFAULT_SCROLLBAR_WIDTH,
@@ -352,7 +356,9 @@ export class SpreadsheetVisualizer {
     this.options.cellTextColor = getDefaultCellTextColor();
     this.options.borderColor = getDefaultBorderColor();
     this.options.selectionColor = getDefaultSelectionColor();
+    this.options.selectionBorderColor = getDefaultSelectionBorderColor();
     this.options.hoverColor = getDefaultHoverColor();
+    this.options.hoverBorderColor = getDefaultHoverBorderColor();
     this.options.scrollbarColor = getDefaultScrollbarColor();
     this.options.scrollbarThumbColor = getDefaultScrollbarThumbColor();
     this.options.scrollbarHoverColor = getDefaultScrollbarHoverColor();
@@ -1067,7 +1073,8 @@ export class SpreadsheetVisualizer {
     this.hoverCtx.clearRect(0, 0, this.hoverCanvas.width, this.hoverCanvas.height);
 
     this.hoverCtx.fillStyle = this.options.hoverColor;
-    this.hoverCtx.strokeStyle = this.options.borderColor;
+    this.hoverCtx.strokeStyle = this.options.hoverBorderColor || this.options.borderColor;
+    this.hoverCtx.lineWidth = 2;
 
     if (this.hoveredCell) {
       const { row, col } = this.hoveredCell;
@@ -1083,8 +1090,16 @@ export class SpreadsheetVisualizer {
         width = this.colOffsets[col + 1] - this.scrollX - this.options.rowHeaderWidth;
       }
 
+      // Draw hover background
       this.hoverCtx.fillRect(x, y, width, height);
+      
+      // Draw enhanced border
       this.hoverCtx.strokeRect(x, y, width, height);
+      
+      // Add inner glow effect
+      this.hoverCtx.strokeStyle = this.options.hoverBorderColor || this.options.borderColor;
+      this.hoverCtx.lineWidth = 1;
+      this.hoverCtx.strokeRect(x + 1, y + 1, width - 2, height - 2);
     }
   }
 
@@ -1093,7 +1108,8 @@ export class SpreadsheetVisualizer {
     this.hoverCtx.clearRect(0, 0, this.hoverCanvas.width, this.hoverCanvas.height);
 
     this.hoverCtx.fillStyle = this.options.hoverColor;
-    this.hoverCtx.strokeStyle = this.options.borderColor;
+    this.hoverCtx.strokeStyle = this.options.hoverBorderColor || this.options.borderColor;
+    this.hoverCtx.lineWidth = 2;
 
     if (this.hoveredCell) {
       const { col } = this.hoveredCell;
@@ -1107,8 +1123,16 @@ export class SpreadsheetVisualizer {
         width = this.colOffsets[col + 1] - this.scrollX - this.options.rowHeaderWidth;
       }
 
+      // Draw hover background
       this.hoverCtx.fillRect(x, 0, width, height);
+      
+      // Draw enhanced border
       this.hoverCtx.strokeRect(x, 0, width, height);
+      
+      // Add inner glow effect
+      this.hoverCtx.strokeStyle = this.options.hoverBorderColor || this.options.borderColor;
+      this.hoverCtx.lineWidth = 1;
+      this.hoverCtx.strokeRect(x + 1, 1, width - 2, height - 2);
     }
   }
 
@@ -1155,7 +1179,9 @@ export class SpreadsheetVisualizer {
       const maxCol = Math.max(startCol, endCol);
 
       const height = this.options.cellHeight;
+      let selectionBounds = { x: 0, y: 0, width: 0, height: 0 };
 
+      // Draw selection backgrounds
       for (let row = minRow; row <= maxRow; row++) {
         for (let col = minCol; col <= maxCol; col++) {
           const y = (row - visibleStartRow) * this.options.cellHeight;
@@ -1169,15 +1195,52 @@ export class SpreadsheetVisualizer {
 
           if (x + width > 0 && x < this.canvas.width && y + height > 0 && y < this.canvas.height) {
             this.selectionCtx.fillRect(x, y, width, height);
+            
+            // Track the bounds for the selection border and handle
+            if (row === minRow && col === minCol) {
+              selectionBounds = { x, y, width: 0, height: 0 };
+            }
+            if (row === maxRow && col === maxCol) {
+              selectionBounds.width = (x + width) - selectionBounds.x;
+              selectionBounds.height = (y + height) - selectionBounds.y;
+            }
           }
         }
+      }
+
+      // Draw enhanced selection border
+      if (selectionBounds.width > 0 && selectionBounds.height > 0) {
+        this.selectionCtx.strokeStyle = this.options.selectionBorderColor || this.options.borderColor;
+        this.selectionCtx.lineWidth = 2;
+        this.selectionCtx.strokeRect(selectionBounds.x, selectionBounds.y, selectionBounds.width, selectionBounds.height);
+        
+        // Add inner border for extra emphasis
+        this.selectionCtx.lineWidth = 1;
+        this.selectionCtx.strokeRect(selectionBounds.x + 1, selectionBounds.y + 1, selectionBounds.width - 2, selectionBounds.height - 2);
+        
+        // Draw selection handle (dot) in bottom-right corner
+        const handleSize = 8;
+        const handleX = selectionBounds.x + selectionBounds.width - handleSize/8;
+        const handleY = selectionBounds.y + selectionBounds.height - handleSize/8;
+        
+        this.selectionCtx.fillStyle = this.options.selectionBorderColor || this.options.borderColor;
+        // this.selectionCtx.ellipse(handleX, handleY, handleSize / 2, handleSize / 2, 0, 0, 2 * Math.PI);
+        this.selectionCtx.beginPath();
+        this.selectionCtx.arc(handleX, handleY, handleSize / 2, 0, 2 * Math.PI);
+        this.selectionCtx.fill();
+        
+        // Add white outline to the handle for better visibility
+        this.selectionCtx.strokeStyle = '#ffffff';
+        this.selectionCtx.lineWidth = 1;
+        this.selectionCtx.stroke();
       }
     }
   }
 
   private drawColSelection() {
     this.selectionCtx.fillStyle = this.options.selectionColor;
-    this.selectionCtx.strokeStyle = this.options.borderColor;
+    this.selectionCtx.strokeStyle = this.options.selectionBorderColor || this.options.borderColor;
+    this.selectionCtx.lineWidth = 2;
 
     const height = Math.min(this.options.cellHeight + this.totalHeight, this.selectionCanvas.height - this.options.scrollbarWidth);
     this.selectedCols.forEach((col) => {
@@ -1191,8 +1254,15 @@ export class SpreadsheetVisualizer {
         width = this.colOffsets[col + 1] - this.scrollX - this.options.rowHeaderWidth;
       }
 
+      // Draw selection background
       this.selectionCtx.fillRect(x, 0, width, height);
+      
+      // Draw enhanced border
       this.selectionCtx.strokeRect(x, 0, width, height);
+      
+      // Add inner border for extra emphasis
+      this.selectionCtx.lineWidth = 1;
+      this.selectionCtx.strokeRect(x + 1, 1, width - 2, height - 2);
     });
   }
 

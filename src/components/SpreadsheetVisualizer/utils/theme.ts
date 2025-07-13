@@ -10,7 +10,9 @@ export interface ThemeColors {
   // Border and UI colors
   borderColor: string;
   selectionColor: string;
+  selectionBorderColor: string;
   hoverColor: string;
+  hoverBorderColor: string;
 
   // Scrollbar colors
   scrollbarColor: string;
@@ -50,29 +52,31 @@ export function getThemeColors(theme?: "light" | "dark"): ThemeColors {
     return {
       // Header colors - match app dark theme
       headerBackgroundColor: "#2d2d30",
-      headerTextColor: "#cccccc",
+      headerTextColor: "#e5e7eb",
 
       // Cell colors - darker but readable
       cellBackgroundColor: "#1e1e1e",
-      cellTextColor: "#cccccc",
+      cellTextColor: "#e5e7eb",
 
       // Border and UI colors
-      borderColor: "#3c3c3c",
-      selectionColor: "rgba(0, 120, 215, 0.3)",
-      hoverColor: "rgba(0, 120, 215, 0.15)",
+      borderColor: "#404040",
+      selectionColor: "rgba(59, 130, 246, 0.25)",
+      selectionBorderColor: "#3b82f6",
+      hoverColor: "rgba(59, 130, 246, 0.12)",
+      hoverBorderColor: "rgba(59, 130, 246, 0.6)",
 
       // Scrollbar colors
       scrollbarColor: "#2d2d30",
-      scrollbarThumbColor: "#666666",
-      scrollbarHoverColor: "#777777",
+      scrollbarThumbColor: "#4b5563",
+      scrollbarHoverColor: "#6b7280",
 
       // Data type specific colors - subtle variations
-      booleanStyle: { backgroundColor: "#2a2a2a", textColor: "#87ceeb" },
-      numericStyle: { backgroundColor: "#2a2a2a", textColor: "#98fb98" },
-      stringStyle: { backgroundColor: "#2a2a2a", textColor: "#cccccc" },
-      dateStyle: { backgroundColor: "#2a2a2a", textColor: "#ffd700" },
-      datetimeStyle: { backgroundColor: "#2a2a2a", textColor: "#ffa500" },
-      nullStyle: { backgroundColor: "#2a2a2a", textColor: "#888888" },
+      booleanStyle: { backgroundColor: "#1e293b", textColor: "#60a5fa" },
+      numericStyle: { backgroundColor: "#14532d", textColor: "#34d399" },
+      stringStyle: { backgroundColor: "#1e1e1e", textColor: "#e5e7eb" },
+      dateStyle: { backgroundColor: "#451a03", textColor: "#fbbf24" },
+      datetimeStyle: { backgroundColor: "#7c2d12", textColor: "#fb923c" },
+      nullStyle: { backgroundColor: "#1e1e1e", textColor: "#9ca3af" },
     };
   }
 
@@ -80,29 +84,31 @@ export function getThemeColors(theme?: "light" | "dark"): ThemeColors {
   return {
     // Header colors - match dataset panel header
     headerBackgroundColor: "#f8f9fa",
-    headerTextColor: "#2c3e50",
+    headerTextColor: "#1f2937",
 
     // Cell colors - clean and bright
     cellBackgroundColor: "#ffffff",
-    cellTextColor: "#2c3e50",
+    cellTextColor: "#1f2937",
 
     // Border and UI colors - match app borders
-    borderColor: "#e1e5e9",
-    selectionColor: "rgba(0, 120, 215, 0.2)",
-    hoverColor: "rgba(0, 120, 215, 0.1)",
+    borderColor: "#e5e7eb",
+    selectionColor: "rgba(59, 130, 246, 0.15)",
+    selectionBorderColor: "#3b82f6",
+    hoverColor: "rgba(59, 130, 246, 0.08)",
+    hoverBorderColor: "rgba(59, 130, 246, 0.4)",
 
     // Scrollbar colors
     scrollbarColor: "#f3f3f3",
-    scrollbarThumbColor: "#d6dade",
-    scrollbarHoverColor: "#c1c8cd",
+    scrollbarThumbColor: "#d1d5db",
+    scrollbarHoverColor: "#9ca3af",
 
     // Data type specific colors - subtle but distinct
-    booleanStyle: { backgroundColor: "#f1f3f4", textColor: "#1565c0" },
-    numericStyle: { backgroundColor: "#f1f3f4", textColor: "#2e7d32" },
-    stringStyle: { backgroundColor: "#f1f3f4", textColor: "#2c3e50" },
-    dateStyle: { backgroundColor: "#f1f3f4", textColor: "#ed6c02" },
-    datetimeStyle: { backgroundColor: "#f1f3f4", textColor: "#d84315" },
-    nullStyle: { backgroundColor: "#f1f3f4", textColor: "#6c757d" },
+    booleanStyle: { backgroundColor: "#eff6ff", textColor: "#2563eb" },
+    numericStyle: { backgroundColor: "#f0fdf4", textColor: "#059669" },
+    stringStyle: { backgroundColor: "#ffffff", textColor: "#1f2937" },
+    dateStyle: { backgroundColor: "#fef3c7", textColor: "#d97706" },
+    datetimeStyle: { backgroundColor: "#fed7aa", textColor: "#ea580c" },
+    nullStyle: { backgroundColor: "#f9fafb", textColor: "#6b7280" },
   };
 }
 

@@ -54,7 +54,9 @@ export interface SpreadsheetOptions {
   cellTextColor?: string;
   borderColor?: string;
   selectionColor?: string;
+  selectionBorderColor?: string;
   hoverColor?: string;
+  hoverBorderColor?: string;
 
   // Scrollbar options
   scrollbarWidth?: number;

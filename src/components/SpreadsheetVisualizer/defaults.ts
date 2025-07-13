@@ -74,8 +74,16 @@ export function getDefaultSelectionColor(): string {
   return getDefaultColors().selectionColor;
 }
 
+export function getDefaultSelectionBorderColor(): string {
+  return getDefaultColors().selectionBorderColor;
+}
+
 export function getDefaultHoverColor(): string {
   return getDefaultColors().hoverColor;
+}
+
+export function getDefaultHoverBorderColor(): string {
+  return getDefaultColors().hoverBorderColor;
 }
 
 export function getDefaultScrollbarColor(): string {
