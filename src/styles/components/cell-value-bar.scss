@@ -12,15 +12,18 @@
   flex-shrink: 0;
 
   &__position {
-    width: 60px;
+    min-width: 60px;
+    max-width: 150px;
     font-family: var(--vscode-editor-font-family);
     font-weight: 500;
-    text-align: center;
     color: var(--vscode-descriptionForeground);
     background-color: var(--vscode-badge-background);
     padding: 2px 6px;
     border-radius: 3px;
     flex-shrink: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   &__value {
@@ -47,6 +50,14 @@
       color: var(--vscode-descriptionForeground);
       font-style: italic;
     }
+  }
+
+  &__raw-value {
+    color: var(--vscode-descriptionForeground);
+    font-style: italic;
+    opacity: 0.7;
+    font-size: 0.9em;
+    margin-left: 4px;
   }
 }
 
@@ -84,12 +95,17 @@
     gap: 8px;
 
     &__position {
-      width: 50px;
+      min-width: 50px;
+      max-width: 120px;
       font-size: 12px;
     }
 
     &__value {
       font-size: 12px;
+    }
+
+    &__raw-value {
+      font-size: 0.85em;
     }
   }
 }

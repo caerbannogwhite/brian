@@ -102,6 +102,41 @@ export class DatasetPanel {
     }
   }
 
+  public getLoadedDatasets(): string[] {
+    return this.datasets.filter((d) => d.isLoaded).map((d) => d.id);
+  }
+
+  public getAvailableDatasets(): DatasetInfo[] {
+    return [...this.datasets];
+  }
+
+  public setOnToggleCallback(callback: (isMinimized: boolean) => void): void {
+    this.onToggleCallback = callback;
+  }
+
+  public getIsMinimized(): boolean {
+    return this.isMinimized;
+  }
+
+  public toggleMinimize(): void {
+    this.isMinimized = !this.isMinimized;
+
+    if (this.isMinimized) {
+      this.panelElement.classList.add("dataset-panel__panel--minimized");
+      this.toggleButton.innerHTML = "+";
+      this.toggleButton.title = "Expand panel";
+    } else {
+      this.panelElement.classList.remove("dataset-panel__panel--minimized");
+      this.toggleButton.innerHTML = "−";
+      this.toggleButton.title = "Minimize panel";
+    }
+
+    // Call the callback if it exists
+    if (this.onToggleCallback) {
+      this.onToggleCallback(this.isMinimized);
+    }
+  }
+
   private setupEventListeners(): void {
     this.toggleButton.addEventListener("click", () => {
       this.toggleMinimize();
@@ -144,48 +179,14 @@ export class DatasetPanel {
       // Create data provider
       const dataProvider = new CdiscDataProvider(datasetInfo.dataset);
 
-      // Add to multi-dataset visualizer
+      // Add to multi-dataset visualizer and switch to it
       await this.multiDatasetVisualizer.addDataset(datasetInfo.id, datasetInfo.label, dataProvider);
+      await this.multiDatasetVisualizer.switchToDataset(datasetInfo.id);
 
       // Mark as loaded
       this.markDatasetAsLoaded(datasetInfo.id);
     } catch (error) {
       console.error(`Failed to load dataset ${datasetInfo.id}:`, error);
-    }
-  }
-
-  public getLoadedDatasets(): string[] {
-    return this.datasets.filter((d) => d.isLoaded).map((d) => d.id);
-  }
-
-  public getAvailableDatasets(): DatasetInfo[] {
-    return [...this.datasets];
-  }
-
-  public setOnToggleCallback(callback: (isMinimized: boolean) => void): void {
-    this.onToggleCallback = callback;
-  }
-
-  public getIsMinimized(): boolean {
-    return this.isMinimized;
-  }
-
-  public toggleMinimize(): void {
-    this.isMinimized = !this.isMinimized;
-
-    if (this.isMinimized) {
-      this.panelElement.classList.add("dataset-panel__panel--minimized");
-      this.toggleButton.innerHTML = "+";
-      this.toggleButton.title = "Expand panel";
-    } else {
-      this.panelElement.classList.remove("dataset-panel__panel--minimized");
-      this.toggleButton.innerHTML = "−";
-      this.toggleButton.title = "Minimize panel";
-    }
-
-    // Call the callback if it exists
-    if (this.onToggleCallback) {
-      this.onToggleCallback(this.isMinimized);
     }
   }
 }

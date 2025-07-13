@@ -1,10 +1,13 @@
 import { MultiDatasetVisualizer } from "../MultiDatasetVisualizer";
 import { DatasetPanel } from "../DatasetPanel";
 import { StatusBar } from "../StatusBar";
-import { CommandPalette } from "../CommandPalette";
+import { CommandPaletteFocusable } from "../CommandPalette/CommandPaletteFocusable";
 import { SpreadsheetOptions } from "../SpreadsheetVisualizer/types";
 import { CdiscDataset } from "../../data/types";
 import { CdiscDataProvider } from "../../data/providers/CdiscDataProvider";
+import { FocusManager } from "./FocusManager";
+import { EventDispatcher } from "./EventDispatcher";
+import { EventHandler } from "./types";
 
 export interface BrianAppOptions {
   spreadsheetOptions?: SpreadsheetOptions;
@@ -12,12 +15,13 @@ export interface BrianAppOptions {
   showDatasetPanel?: boolean;
   statusBarVisible?: boolean;
   commandPaletteEnabled?: boolean;
+  debugMode?: boolean;
 }
 
-export class BrianApp {
+export class BrianApp implements EventHandler {
   private container: HTMLElement;
   private statusBar!: StatusBar;
-  private commandPalette!: CommandPalette;
+  private commandPalette!: CommandPaletteFocusable;
   private mainContainer!: HTMLElement;
   private datasetPanelContainer!: HTMLElement;
   private spreadsheetContainer!: HTMLElement;
@@ -25,6 +29,10 @@ export class BrianApp {
   private datasetPanel!: DatasetPanel;
   private options: BrianAppOptions;
   private theme: "light" | "dark" = "dark";
+
+  // Event system
+  private focusManager: FocusManager;
+  private eventDispatcher: EventDispatcher;
 
   constructor(parent: HTMLElement, options: BrianAppOptions = {}) {
     this.options = {
@@ -39,10 +47,14 @@ export class BrianApp {
     this.container.className = "brian-app";
     this.setupTheme();
 
+    // Initialize event system
+    this.focusManager = new FocusManager({ debugMode: options.debugMode || false });
+    this.eventDispatcher = new EventDispatcher(this.focusManager, { debugMode: options.debugMode || false });
+
     this.createLayout();
     this.setupComponents();
     this.registerCommands();
-    this.setupEventListeners();
+    this.setupEventSystem();
 
     parent.appendChild(this.container);
   }
@@ -74,7 +86,8 @@ export class BrianApp {
 
     // Command palette
     if (this.options.commandPaletteEnabled) {
-      this.commandPalette = new CommandPalette(this.container);
+      this.commandPalette = new CommandPaletteFocusable(this.container);
+      this.eventDispatcher.registerComponent(this.commandPalette);
     }
 
     // Calculate dimensions
@@ -82,6 +95,9 @@ export class BrianApp {
 
     // Multi-dataset visualizer
     this.multiDatasetVisualizer = new MultiDatasetVisualizer(this.spreadsheetContainer, this.options.spreadsheetOptions);
+
+    // Set event dispatcher on multi-dataset visualizer
+    this.multiDatasetVisualizer.setEventDispatcher(this.eventDispatcher);
 
     // Dataset panel
     if (this.options.showDatasetPanel) {
@@ -96,7 +112,7 @@ export class BrianApp {
 
     // Listen for dataset changes
     this.setupDatasetListeners();
-    
+
     // Setup file drop handling
     this.setupFileDropHandling();
   }
@@ -114,9 +130,9 @@ export class BrianApp {
     return "light";
   }
 
-  private setupEventListeners(): void {
-    // Window resize
-    window.addEventListener("resize", () => this.updateDimensions());
+  private setupEventSystem(): void {
+    // Register BrianApp as a global event handler
+    this.eventDispatcher.addGlobalEventHandler(this);
 
     // Theme change detection
     if (this.options.theme === "auto") {
@@ -124,23 +140,30 @@ export class BrianApp {
         this.setTheme(e.matches ? "dark" : "light");
       });
     }
-
-    // Global keyboard shortcuts
-    document.addEventListener("keydown", (e) => this.handleGlobalKeyboard(e));
   }
 
-  private handleGlobalKeyboard(e: KeyboardEvent): void {
+  // EventHandler interface implementation
+  public async handleKeyDown(e: KeyboardEvent): Promise<boolean> {
     // Ctrl+Shift+P for command palette (if Ctrl+P is taken by browser)
     if (e.ctrlKey && e.shiftKey && e.key === "P") {
       e.preventDefault();
       this.commandPalette?.show();
+      return true;
     }
 
     // F11 for fullscreen
     if (e.key === "F11") {
       e.preventDefault();
       this.toggleFullscreen();
+      return true;
     }
+
+    return false;
+  }
+
+  public async handleResize(_e: Event): Promise<boolean> {
+    this.updateDimensions();
+    return true;
   }
 
   private updateDimensions(): void {
@@ -171,10 +194,21 @@ export class BrianApp {
       originalCloseDataset(id);
       this.datasetPanel?.markDatasetAsUnloaded(id);
       this.updateStatusBarDatasetInfo();
+      this.updateFocusAfterDatasetChange();
     };
 
     // Listen for dataset switches (this would require extending MultiDatasetVisualizer)
     // For now, we'll update status bar when datasets are added
+  }
+
+  private updateFocusAfterDatasetChange(): void {
+    // Set focus to the active dataset's spreadsheet, or clear focus if no active dataset
+    const activeDatasetId = this.multiDatasetVisualizer.getActiveDatasetId();
+    if (activeDatasetId) {
+      this.eventDispatcher.setFocus(`spreadsheet-${activeDatasetId}`);
+    } else {
+      this.focusManager.clearFocus();
+    }
   }
 
   private registerCommands(): void {
@@ -302,26 +336,25 @@ export class BrianApp {
       try {
         // Generate a unique ID for the dataset
         const datasetId = dataset.name.toLowerCase();
-        
+
         // Add to dataset panel first
         this.datasetPanel.addDataset(datasetId, datasetId, dataset.label || dataset.name, dataset);
-        
+
         // Create data provider and add to visualizer
         const dataProvider = new CdiscDataProvider(dataset);
         await this.multiDatasetVisualizer.addDataset(datasetId, dataset.label || dataset.name, dataProvider);
-        
+
         // Mark as loaded in panel
         this.datasetPanel.markDatasetAsLoaded(datasetId);
-        
+
         // Update status bar
         this.updateStatusBarDatasetInfo();
-        
+
         // Show success message
         this.showMessage(`Dataset "${fileName}" loaded successfully`, "info");
-        
       } catch (error) {
         console.error("Error adding dropped dataset:", error);
-        const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
         this.showMessage(`Failed to load dataset: ${errorMessage}`, "error");
       }
     });
@@ -331,6 +364,16 @@ export class BrianApp {
   public async addDataset(id: string, name: string, dataset: CdiscDataset): Promise<void> {
     this.datasetPanel.addDataset(id, id, name, dataset);
     this.updateStatusBarDatasetInfo();
+    this.updateFocusAfterDatasetChange();
+  }
+
+  // Event system access methods
+  public getEventDispatcher(): EventDispatcher {
+    return this.eventDispatcher;
+  }
+
+  public getFocusManager(): FocusManager {
+    return this.focusManager;
   }
 
   public setTheme(theme: "light" | "dark"): void {
@@ -347,6 +390,11 @@ export class BrianApp {
   }
 
   public destroy(): void {
+    // Clean up event system
+    this.eventDispatcher.removeGlobalEventHandler(this);
+    this.focusManager.clearFocus();
+    this.focusManager.clearFocusStack();
+
     this.statusBar?.destroy();
     this.commandPalette?.destroy();
     this.container.remove();

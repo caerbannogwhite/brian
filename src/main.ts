@@ -23,6 +23,7 @@ async function initApplication() {
       datetimeFormat: "yyyy-MM-dd HH:mm:ss",
       numberFormat: { minimumFractionDigits: 2, maximumFractionDigits: 2 },
     },
+    debugMode: false,
   });
 
   // Option to load sample datasets for development

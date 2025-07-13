@@ -23,6 +23,31 @@ export class DragDropZone {
     parent.appendChild(this.container);
   }
 
+  public show(): void {
+    this.container.style.display = "flex";
+  }
+
+  public hide(): void {
+    this.container.style.display = "none";
+  }
+
+  public destroy(): void {
+    // Clean up event listeners
+    ["dragenter", "dragover", "dragleave", "drop"].forEach((eventName) => {
+      document.body.removeEventListener(eventName, this.preventDefaults, false);
+    });
+
+    // Remove from DOM
+    if (this.container.parentNode) {
+      this.container.parentNode.removeChild(this.container);
+    }
+  }
+
+  // Accessor methods for wrapper
+  public getContainer(): HTMLElement {
+    return this.container;
+  }
+
   private createDropZone(): void {
     this.dropZone = document.createElement("div");
     this.dropZone.className = "drag-drop-zone__area";
@@ -80,7 +105,7 @@ export class DragDropZone {
     fileInput.addEventListener("change", (e) => {
       const files = (e.target as HTMLInputElement).files;
       if (files && files.length > 0) {
-        this.handleFiles([files[0]]);
+        this._handleFiles([files[0]]);
       }
     });
 
@@ -99,15 +124,15 @@ export class DragDropZone {
 
     // Handle drag events
     ["dragenter", "dragover"].forEach((eventName) => {
-      this.dropZone.addEventListener(eventName, () => this.handleDragEnter(), false);
+      this.dropZone.addEventListener(eventName, () => this._handleDragEnter(), false);
     });
 
     ["dragleave", "drop"].forEach((eventName) => {
-      this.dropZone.addEventListener(eventName, () => this.handleDragLeave(), false);
+      this.dropZone.addEventListener(eventName, () => this._handleDragLeave(), false);
     });
 
     // Handle file drop
-    this.dropZone.addEventListener("drop", (e) => this.handleDrop(e), false);
+    this.dropZone.addEventListener("drop", (e) => this._handleDrop(e), false);
   }
 
   private preventDefaults(e: Event): void {
@@ -115,28 +140,28 @@ export class DragDropZone {
     e.stopPropagation();
   }
 
-  private handleDragEnter(): void {
+  private _handleDragEnter(): void {
     if (!this.isDragOver) {
       this.isDragOver = true;
       this.dropZone.classList.add("drag-drop-zone__area--active");
     }
   }
 
-  private handleDragLeave(): void {
+  private _handleDragLeave(): void {
     this.isDragOver = false;
     this.dropZone.classList.remove("drag-drop-zone__area--active");
   }
 
-  private handleDrop(e: DragEvent): void {
-    this.handleDragLeave();
+  private _handleDrop(e: DragEvent): void {
+    this._handleDragLeave();
 
     const files = Array.from(e.dataTransfer?.files || []);
     if (files.length > 0) {
-      this.handleFiles(files);
+      this._handleFiles(files);
     }
   }
 
-  private async handleFiles(files: File[]): Promise<void> {
+  private async _handleFiles(files: File[]): Promise<void> {
     // Take only the first file for now
     const file = files[0];
 
@@ -214,26 +239,6 @@ export class DragDropZone {
 
       retryButton?.addEventListener("click", restore);
       setTimeout(restore, 5000);
-    }
-  }
-
-  public show(): void {
-    this.container.style.display = "flex";
-  }
-
-  public hide(): void {
-    this.container.style.display = "none";
-  }
-
-  public destroy(): void {
-    // Clean up event listeners
-    ["dragenter", "dragover", "dragleave", "drop"].forEach((eventName) => {
-      document.body.removeEventListener(eventName, this.preventDefaults, false);
-    });
-
-    // Remove from DOM
-    if (this.container.parentNode) {
-      this.container.parentNode.removeChild(this.container);
     }
   }
 }

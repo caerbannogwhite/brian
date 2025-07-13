@@ -98,6 +98,10 @@ export class ColumnStatsVisualizer {
     }
   }
 
+  public getContainer(): HTMLElement {
+    return this.container;
+  }
+
   private render() {
     if (!this.currentColumn || !this.stats) return;
 

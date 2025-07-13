@@ -42,7 +42,6 @@ export function getColumns(dataset: CdiscDataset) {
 
 function mapDataType(cdiscType: string): "string" | "integer" | "float" | "date" | "datetime" | "boolean" | "null" {
   switch (cdiscType.toLowerCase()) {
-    case "integer":
     case "decimal":
     case "float":
       return "float";

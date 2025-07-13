@@ -1,16 +1,17 @@
-import { SpreadsheetVisualizer } from "../SpreadsheetVisualizer";
+import { SpreadsheetVisualizerFocusable } from "../SpreadsheetVisualizer/SpreadsheetVisualizerFocusable";
 import { DataProvider } from "../SpreadsheetVisualizer/types";
 import { SpreadsheetOptions } from "../SpreadsheetVisualizer/types";
-import { ColumnStatsVisualizer } from "../ColumnStatsVisualizer/ColumnStatsVisualizer";
-import { DragDropZone } from "../DragDropZone";
+import { ColumnStatsVisualizerFocusable } from "../ColumnStatsVisualizer/ColumnStatsVisualizerFocusable";
+import { DragDropZoneFocusable } from "../DragDropZone/DragDropZoneFocusable";
 import { CellValueBar } from "../CellValueBar";
 import { CdiscDataset } from "../../data/types";
+import { EventDispatcher } from "../BrianApp/EventDispatcher";
 
 interface DatasetTab {
   id: string;
   name: string;
   dataProvider: DataProvider;
-  spreadsheetVisualizer: SpreadsheetVisualizer;
+  spreadsheetVisualizer: SpreadsheetVisualizerFocusable;
   container: HTMLElement;
   isActive: boolean;
 }
@@ -23,10 +24,11 @@ export class MultiDatasetVisualizer {
   private tabs: DatasetTab[] = [];
   private activeTabId: string | null = null;
   private options: SpreadsheetOptions;
-  private sharedStatsVisualizer: ColumnStatsVisualizer;
-  private dragDropZone: DragDropZone | null = null;
+  private sharedStatsVisualizer: ColumnStatsVisualizerFocusable;
+  private dragDropZone: DragDropZoneFocusable | null = null;
   private cellValueBar: CellValueBar | null = null;
-  private onFileDropped?: (dataset: CdiscDataset, fileName: string) => void;
+  // private onFileDropped?: (dataset: CdiscDataset, fileName: string) => void;
+  private eventDispatcher?: EventDispatcher;
 
   constructor(parent: HTMLElement, options: SpreadsheetOptions = {}) {
     this.container = document.createElement("div");
@@ -62,7 +64,7 @@ export class MultiDatasetVisualizer {
     this.container.offsetHeight;
 
     // Create shared stats visualizer
-    this.sharedStatsVisualizer = new ColumnStatsVisualizer(this.container, null, 350);
+    this.sharedStatsVisualizer = new ColumnStatsVisualizerFocusable(this.container, null, 350);
 
     // Setup resize handling
     this.setupResizeHandling();
@@ -92,7 +94,11 @@ export class MultiDatasetVisualizer {
     // Calculate dimensions that will fill the available space
     const availableWidth = containerWidth > 0 ? containerWidth : this.options.width;
     const availableHeight =
-      containerHeight > 0 ? containerHeight - tabsHeight - cellValueBarHeight : this.options.height ? this.options.height - tabsHeight - cellValueBarHeight : undefined;
+      containerHeight > 0
+        ? containerHeight - tabsHeight - cellValueBarHeight
+        : this.options.height
+        ? this.options.height - tabsHeight - cellValueBarHeight
+        : undefined;
 
     // Create options for the spreadsheet with calculated dimensions
     const spreadsheetOptions = {
@@ -104,8 +110,13 @@ export class MultiDatasetVisualizer {
       minHeight: Math.min(this.options.minHeight || 400, availableHeight || 400),
     };
 
-    // Create spreadsheet visualizer for this dataset with shared stats visualizer
-    const spreadsheetVisualizer = new SpreadsheetVisualizer(datasetContainer, dataProvider, spreadsheetOptions, this.sharedStatsVisualizer);
+    // Create wrapper for event handling
+    const spreadsheetVisualizer = new SpreadsheetVisualizerFocusable(
+      datasetContainer,
+      dataProvider,
+      spreadsheetOptions,
+      `spreadsheet-${id}`
+    );
 
     // Connect selection change to cell value bar
     spreadsheetVisualizer.setOnSelectionChange((cell) => {
@@ -127,6 +138,11 @@ export class MultiDatasetVisualizer {
 
     this.tabs.push(tab);
     this.createTabElement(tab);
+
+    // Register with event dispatcher if available
+    if (this.eventDispatcher) {
+      this.eventDispatcher.registerComponent(tab.spreadsheetVisualizer);
+    }
 
     // Initialize the spreadsheet
     await spreadsheetVisualizer.initialize();
@@ -151,6 +167,11 @@ export class MultiDatasetVisualizer {
     if (tabIndex === -1) return;
 
     const tab = this.tabs[tabIndex];
+
+    // Unregister from event dispatcher if available
+    if (this.eventDispatcher) {
+      this.eventDispatcher.unregisterComponent(tab.spreadsheetVisualizer.componentId);
+    }
 
     // Remove tab element
     const tabElement = this.tabsContainer.querySelector(`[data-tab-id="${id}"]`);
@@ -193,8 +214,17 @@ export class MultiDatasetVisualizer {
     return this.tabs.map((t) => t.id);
   }
 
-  public setOnFileDroppedCallback(callback: (dataset: CdiscDataset, fileName: string) => void): void {
-    this.onFileDropped = callback;
+  public setOnFileDroppedCallback(_: (dataset: CdiscDataset, fileName: string) => void): void {
+    // this.onFileDropped = callback;
+  }
+
+  public setEventDispatcher(eventDispatcher: EventDispatcher): void {
+    this.eventDispatcher = eventDispatcher;
+
+    // Register all existing tabs with the event dispatcher
+    for (const tab of this.tabs) {
+      this.eventDispatcher.registerComponent(tab.spreadsheetVisualizer);
+    }
   }
 
   private createTabElement(tab: DatasetTab): void {
@@ -247,6 +277,11 @@ export class MultiDatasetVisualizer {
       this.activeTabId = id;
       newTab.container.classList.add("multi-dataset-visualizer__dataset-container--active");
       this.updateTabStyles(id, true);
+
+      // Set focus on the new active tab
+      if (this.eventDispatcher) {
+        this.eventDispatcher.setFocus(newTab.spreadsheetVisualizer.componentId);
+      }
 
       // Force layout calculation and resize to ensure spreadsheet takes full space
       await new Promise((resolve) => requestAnimationFrame(resolve));
@@ -311,7 +346,7 @@ export class MultiDatasetVisualizer {
       this.dragDropZone.destroy();
       this.dragDropZone = null;
     }
-    
+
     // Clean up cell value bar
     if (this.cellValueBar) {
       this.cellValueBar.destroy();
@@ -321,19 +356,19 @@ export class MultiDatasetVisualizer {
 
   private showEmptyState(): void {
     if (!this.dragDropZone) {
-      this.dragDropZone = new DragDropZone(this.contentContainer, {
-        onFileDropped: (dataset: CdiscDataset, fileName: string) => {
-          if (this.onFileDropped) {
-            this.onFileDropped(dataset, fileName);
-          }
-        },
-        onError: (error: string) => {
-          console.error("DragDropZone Error:", error);
-          // You could emit this error to a parent component for better error handling
-        },
-      });
+      this.dragDropZone = new DragDropZoneFocusable(this.contentContainer);
+
+      // Create wrapper and register with event dispatcher
+      if (this.eventDispatcher) {
+        this.eventDispatcher.registerComponent(this.dragDropZone);
+        this.eventDispatcher.setFocus(this.dragDropZone.componentId);
+      }
     } else {
       this.dragDropZone.show();
+      // Set focus when showing again
+      if (this.eventDispatcher && this.dragDropZone) {
+        this.eventDispatcher.setFocus(this.dragDropZone.componentId);
+      }
     }
   }
 
@@ -341,13 +376,18 @@ export class MultiDatasetVisualizer {
     if (this.dragDropZone) {
       this.dragDropZone.hide();
     }
+
+    // Unregister from event dispatcher when hiding
+    if (this.eventDispatcher && this.dragDropZone) {
+      this.eventDispatcher.unregisterComponent(this.dragDropZone.componentId);
+    }
   }
 
   private showCellValueBar(): void {
     if (this.cellValueBar) return;
 
     this.cellValueBar = new CellValueBar({
-      container: this.cellValueBarContainer
+      container: this.cellValueBarContainer,
     });
   }
 

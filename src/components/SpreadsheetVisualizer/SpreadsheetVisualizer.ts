@@ -39,10 +39,9 @@ import {
   DEFAULT_DATETIME_LOCALE,
 } from "./defaults";
 import { listenForThemeChanges } from "./utils/theme";
-import { Column, SpreadsheetOptions, DataProvider } from "./types";
+import { Column, SpreadsheetOptions, DataProvider, DatasetMetadata } from "./types";
 import { ColumnInternal } from "./internals";
 import { minMax } from "./utils/drawing";
-import { throttle } from "./utils/throttle";
 import { ColumnStatsVisualizer } from "../ColumnStatsVisualizer/ColumnStatsVisualizer";
 import { ContextMenu } from "./ContextMenu";
 import { getFormattedValueAndStyle } from "./utils/formatting";
@@ -72,19 +71,20 @@ enum ToDraw {
 }
 
 export class SpreadsheetVisualizer {
-  private container: HTMLElement;
-  private canvas: HTMLCanvasElement;
-  private selectionCanvas: HTMLCanvasElement;
-  private hoverCanvas: HTMLCanvasElement;
-  private ctx: CanvasRenderingContext2D;
-  private selectionCtx: CanvasRenderingContext2D;
-  private hoverCtx: CanvasRenderingContext2D;
-  private dataProvider: DataProvider;
-  private columns: ColumnInternal[];
-  private totalRows: number;
-  private totalCols: number;
-  private options: RequiredSpreadsheetOptions;
-  private throttledMouseMove: (event: MouseEvent) => void;
+  protected container: HTMLElement;
+  protected canvas: HTMLCanvasElement;
+  protected selectionCanvas: HTMLCanvasElement;
+  protected hoverCanvas: HTMLCanvasElement;
+  protected ctx: CanvasRenderingContext2D;
+  protected selectionCtx: CanvasRenderingContext2D;
+  protected hoverCtx: CanvasRenderingContext2D;
+  protected dataProvider: DataProvider;
+  protected metadata: DatasetMetadata | null = null;
+  protected columns: ColumnInternal[];
+  protected totalRows: number;
+  protected totalCols: number;
+  protected options: RequiredSpreadsheetOptions;
+  // protected throttledMouseMove: (event: MouseEvent) => void;
 
   // State variables
   private scrollX = 0;
@@ -122,7 +122,7 @@ export class SpreadsheetVisualizer {
   private themeCleanup: (() => void) | null = null;
 
   // Selection change callback
-  private onSelectionChange?: (cell: { row: number; col: number; value: any; column: ColumnInternal } | null) => void;
+  private onSelectionChange?: (cell: { row: number; col: number; value: any; formatted: string; column: ColumnInternal } | null) => void;
 
   constructor(
     container: HTMLElement,
@@ -227,8 +227,9 @@ export class SpreadsheetVisualizer {
     this.options.height = minMax(this.options.height, this.options.minHeight, this.options.maxHeight);
     this.options.width = minMax(this.options.width, this.options.minWidth, this.options.maxWidth);
 
+    // TODO: figure out if this is necessary
     // Initialize throttled mouse move handler (16ms = ~60fps)
-    this.throttledMouseMove = throttle(this.handleMouseMove.bind(this), 16);
+    // this.throttledMouseMove = throttle(this._handleMouseMove.bind(this), 16);
 
     // Use provided stats visualizer or create a new one
     if (statsVisualizer) {
@@ -253,10 +254,12 @@ export class SpreadsheetVisualizer {
   }
 
   public async initialize() {
-    const metadata = await this.dataProvider.getMetadata();
-    this.columns = metadata.columns.map((col) => new ColumnInternal(col, this.options));
-    this.totalRows = metadata.totalRows;
-    this.totalCols = metadata.totalColumns;
+    this.metadata = await this.dataProvider.getMetadata();
+    if (!this.metadata) return;
+
+    this.columns = this.metadata.columns.map((col) => new ColumnInternal(col, this.options));
+    this.totalRows = this.metadata.totalRows;
+    this.totalCols = this.metadata.totalColumns;
 
     this.setupEventListeners();
     await this.updateLayout();
@@ -275,7 +278,9 @@ export class SpreadsheetVisualizer {
     return this.selectedCols.map((colIndex) => this.columns[colIndex] as Column).filter((col) => col !== undefined);
   }
 
-  public setOnSelectionChange(callback: (cell: { row: number; col: number; value: any; column: ColumnInternal } | null) => void): void {
+  public setOnSelectionChange(
+    callback: (cell: { row: number; col: number; value: any; formatted: string; column: Column } | null) => void
+  ): void {
     this.onSelectionChange = callback;
   }
 
@@ -334,6 +339,11 @@ export class SpreadsheetVisualizer {
     return { headers, indeces: rowIndeces, data: formattedData };
   }
 
+  // Accessor methods for wrapper
+  public getContainer(): HTMLElement {
+    return this.container;
+  }
+
   private updateThemeColors(): void {
     // Update colors based on current theme
     this.options.headerBackgroundColor = getDefaultHeaderBackgroundColor();
@@ -350,18 +360,18 @@ export class SpreadsheetVisualizer {
 
   private setupEventListeners() {
     // Mouse events
-    this.canvas.addEventListener("mousedown", (event) => this.handleMouseDown(event).catch(console.error));
-    this.canvas.addEventListener("mousemove", this.throttledMouseMove);
-    this.canvas.addEventListener("mouseup", this.handleMouseUp.bind(this));
-    this.canvas.addEventListener("mouseleave", this.handleMouseLeave.bind(this));
-    this.canvas.addEventListener("wheel", (event) => this.handleWheel(event).catch(console.error));
+    this.canvas.addEventListener("mousedown", (event) => this._handleMouseDown(event).catch(console.error));
+    this.canvas.addEventListener("mousemove", (event) => this._handleMouseMove(event).catch(console.error));
+    this.canvas.addEventListener("mouseup", this._handleMouseUp.bind(this));
+    this.canvas.addEventListener("mouseleave", this._handleMouseLeave.bind(this));
+    this.canvas.addEventListener("wheel", (event) => this._handleWheel(event).catch(console.error));
     this.canvas.addEventListener("contextmenu", (event) => this.contextMenu.show(event).catch(console.error));
 
     // Keyboard events
-    window.addEventListener("keydown", (event) => this.handleKeyDown(event).catch(console.error));
+    window.addEventListener("keydown", (event) => this._handleKeyDown(event).catch(console.error));
 
     // Window events
-    window.addEventListener("resize", () => this.handleResize().catch(console.error));
+    window.addEventListener("resize", () => this._handleResize().catch(console.error));
 
     // Hide context menu when clicking outside
     document.addEventListener("click", () => this.contextMenu.hide());
@@ -549,7 +559,7 @@ export class SpreadsheetVisualizer {
     this.toDraw = ToDraw.None;
   }
 
-  private async handleMouseDown(event: MouseEvent) {
+  protected async _handleMouseDown(event: MouseEvent): Promise<void> {
     const rect = this.canvas.getBoundingClientRect();
     const x = event.clientX - rect.left;
     const y = event.clientY - rect.top;
@@ -644,7 +654,7 @@ export class SpreadsheetVisualizer {
     await this.draw();
   }
 
-  private async handleMouseMove(event: MouseEvent) {
+  protected async _handleMouseMove(event: MouseEvent): Promise<void> {
     const rect = this.canvas.getBoundingClientRect();
     const x = event.clientX - rect.left;
     const y = event.clientY - rect.top;
@@ -703,19 +713,19 @@ export class SpreadsheetVisualizer {
     await this.draw();
   }
 
-  private handleMouseUp() {
+  protected async _handleMouseUp(_: MouseEvent): Promise<void> {
     this.mouseState = MouseState.Idle;
   }
 
-  private async handleMouseLeave() {
+  protected async _handleMouseLeave(_: MouseEvent): Promise<void> {
     this.hoveredCell = null;
     this.mouseState = MouseState.Idle;
     this.updateToDraw(ToDraw.CellHover);
 
-    await this.draw();
+    this.draw();
   }
 
-  private async handleWheel(event: WheelEvent) {
+  protected async _handleWheel(event: WheelEvent): Promise<void> {
     event.preventDefault();
 
     // Zoom
@@ -746,7 +756,7 @@ export class SpreadsheetVisualizer {
     await this.draw();
   }
 
-  private async handleKeyDown(event: KeyboardEvent) {
+  protected async _handleKeyDown(event: KeyboardEvent): Promise<void> {
     if (!this.selectedCells) return;
 
     const { startRow, endRow, startCol, endCol } = this.selectedCells;
@@ -771,10 +781,11 @@ export class SpreadsheetVisualizer {
         this.scrollY = minMax((row - 1) * this.options.cellHeight - this.canvas.height / 2, 0, this.totalScrollY);
         if (prevScrollY !== this.scrollY) {
           this.updateToDraw(ToDraw.Cells);
+          this.notifySelectionChange();
         } else {
           this.updateToDraw(ToDraw.Selection);
+          this.notifySelectionChange();
         }
-        this.notifySelectionChange();
         break;
 
       case "ArrowDown":
@@ -791,10 +802,11 @@ export class SpreadsheetVisualizer {
         this.scrollY = minMax((row + 1) * this.options.cellHeight - this.canvas.height / 2, 0, this.totalScrollY);
         if (prevScrollY !== this.scrollY) {
           this.updateToDraw(ToDraw.Cells);
+          this.notifySelectionChange();
         } else {
           this.updateToDraw(ToDraw.Selection);
+          this.notifySelectionChange();
         }
-        this.notifySelectionChange();
         break;
 
       case "ArrowLeft":
@@ -811,10 +823,11 @@ export class SpreadsheetVisualizer {
         this.scrollX = minMax(this.colOffsets[col] - this.canvas.width / 2, 0, this.totalScrollX);
         if (prevScrollX !== this.scrollX) {
           this.updateToDraw(ToDraw.Cells);
+          this.notifySelectionChange();
         } else {
           this.updateToDraw(ToDraw.Selection);
+          this.notifySelectionChange();
         }
-        this.notifySelectionChange();
         break;
 
       case "ArrowRight":
@@ -831,10 +844,11 @@ export class SpreadsheetVisualizer {
         this.scrollX = minMax(this.colOffsets[col] - this.canvas.width / 2, 0, this.totalScrollX);
         if (prevScrollX !== this.scrollX) {
           this.updateToDraw(ToDraw.Cells);
+          this.notifySelectionChange();
         } else {
           this.updateToDraw(ToDraw.Selection);
+          this.notifySelectionChange();
         }
-        this.notifySelectionChange();
         break;
 
       // Copy
@@ -856,15 +870,15 @@ export class SpreadsheetVisualizer {
     await this.draw();
   }
 
-  private async handleResize() {
+  protected async _handleResize(): Promise<void> {
     await this.updateLayout();
     this.updateToDraw(ToDraw.Cells);
     await this.draw();
   }
 
+  // Public method to trigger resize from external components
   public async resize(): Promise<void> {
-    // Public method to trigger resize from external components
-    await this.handleResize();
+    await this._handleResize();
   }
 
   private isMouseOverVerticalScrollbar(x: number, _: number): boolean {
@@ -929,8 +943,8 @@ export class SpreadsheetVisualizer {
     // Find the row
     const row = Math.floor(adjustedY / this.options.cellHeight);
 
-    // Check bounds
-    if (row >= 0 && row < this.totalRows && col < this.totalCols) {
+    // Check bounds: this.totalRows is included because the row 0 is the column headers
+    if (row >= 0 && row <= this.totalRows && col < this.totalCols) {
       return { row, col };
     }
 
@@ -1272,7 +1286,8 @@ export class SpreadsheetVisualizer {
         this.onSelectionChange({
           row: startRow,
           col: startCol,
-          value: formatted,
+          value: cellValue,
+          formatted: formatted,
           column,
         });
       }
