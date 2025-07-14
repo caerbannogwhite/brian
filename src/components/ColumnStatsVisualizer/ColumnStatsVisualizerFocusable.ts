@@ -25,20 +25,4 @@ export class ColumnStatsVisualizerFocusable extends ColumnStatsVisualizer implem
   public isFocused(): boolean {
     return this.focusableElement.contains(document.activeElement);
   }
-
-  public async handleKeyDown(_: KeyboardEvent): Promise<boolean> {
-    return false;
-  }
-
-  public async handleMouseDown(_: MouseEvent): Promise<boolean> {
-    return false;
-  }
-
-  public async handleMouseMove(_: MouseEvent): Promise<boolean> {
-    return false;
-  }
-
-  public async handleResize(_: Event): Promise<boolean> {
-    return false;
-  }
 }

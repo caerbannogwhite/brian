@@ -58,9 +58,7 @@ export class ColumnStatsVisualizer {
 
   private async calculateStats() {
     if (!this.currentColumn || !this.spreadsheetVisualizer) return;
-
     const values = await this.spreadsheetVisualizer.getColumnValues(this.currentColumn!.key);
-
     this.stats = {
       totalCount: values.length,
       nullCount: values.filter((v) => v.raw === null).length,

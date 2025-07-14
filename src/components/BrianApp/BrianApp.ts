@@ -1,7 +1,7 @@
 import { MultiDatasetVisualizer } from "../MultiDatasetVisualizer";
 import { DatasetPanel } from "../DatasetPanel";
 import { StatusBar } from "../StatusBar";
-import { CommandPaletteFocusable } from "../CommandPalette/CommandPaletteFocusable";
+import { CommandPalette } from "../CommandPalette/CommandPalette";
 import { SpreadsheetOptions } from "../SpreadsheetVisualizer/types";
 import { CdiscDataset } from "../../data/types";
 import { CdiscDataProvider } from "../../data/providers/CdiscDataProvider";
@@ -21,7 +21,7 @@ export interface BrianAppOptions {
 export class BrianApp implements EventHandler {
   private container: HTMLElement;
   private statusBar!: StatusBar;
-  private commandPalette!: CommandPaletteFocusable;
+  private commandPalette!: CommandPalette;
   private mainContainer!: HTMLElement;
   private datasetPanelContainer!: HTMLElement;
   private spreadsheetContainer!: HTMLElement;
@@ -59,6 +59,71 @@ export class BrianApp implements EventHandler {
     parent.appendChild(this.container);
   }
 
+  // Public API methods
+  public async addDataset(id: string, name: string, dataset: CdiscDataset): Promise<void> {
+    this.datasetPanel.addDataset(id, id, name, dataset);
+    this.updateStatusBarDatasetInfo();
+    this.updateFocusAfterDatasetChange();
+  }
+
+  // Event system access methods
+  public getEventDispatcher(): EventDispatcher {
+    return this.eventDispatcher;
+  }
+
+  public getFocusManager(): FocusManager {
+    return this.focusManager;
+  }
+
+  public setTheme(theme: "light" | "dark"): void {
+    this.container.classList.remove(`brian-app--${this.theme}`);
+    document.body.classList.remove(`theme-${this.theme}`);
+
+    this.theme = theme;
+    this.container.classList.add(`brian-app--${this.theme}`);
+    document.body.classList.add(`theme-${this.theme}`);
+  }
+
+  public showMessage(message: string, type: "info" | "warning" | "error" = "info"): void {
+    this.statusBar?.showMessage(message, type);
+  }
+
+  public destroy(): void {
+    // Clean up event system
+    this.eventDispatcher.removeGlobalEventHandler(this);
+    this.focusManager.clearFocus();
+    this.focusManager.clearFocusStack();
+
+    this.statusBar?.destroy();
+    this.commandPalette?.destroy();
+    this.container.remove();
+  }
+
+  // EventHandler interface implementation
+  public async handleKeyDown(e: KeyboardEvent): Promise<boolean> {
+    // Ctrl+Shift+P for command palette (if Ctrl+P is taken by browser)
+    if (e.ctrlKey && e.shiftKey && e.key === "P") {
+      e.preventDefault();
+
+      this.commandPalette?.show();
+      return true;
+    }
+
+    // F11 for fullscreen
+    if (e.key === "F11") {
+      e.preventDefault();
+      this.toggleFullscreen();
+      return true;
+    }
+
+    return false;
+  }
+
+  public async handleResize(_e: Event): Promise<boolean> {
+    this.updateDimensions();
+    return true;
+  }
+
   private createLayout(): void {
     // Main container (excluding status bar)
     this.mainContainer = document.createElement("div");
@@ -86,8 +151,7 @@ export class BrianApp implements EventHandler {
 
     // Command palette
     if (this.options.commandPaletteEnabled) {
-      this.commandPalette = new CommandPaletteFocusable(this.container);
-      this.eventDispatcher.registerComponent(this.commandPalette);
+      this.commandPalette = new CommandPalette(this.container);
     }
 
     // Calculate dimensions
@@ -140,30 +204,6 @@ export class BrianApp implements EventHandler {
         this.setTheme(e.matches ? "dark" : "light");
       });
     }
-  }
-
-  // EventHandler interface implementation
-  public async handleKeyDown(e: KeyboardEvent): Promise<boolean> {
-    // Ctrl+Shift+P for command palette (if Ctrl+P is taken by browser)
-    if (e.ctrlKey && e.shiftKey && e.key === "P") {
-      e.preventDefault();
-      this.commandPalette?.show();
-      return true;
-    }
-
-    // F11 for fullscreen
-    if (e.key === "F11") {
-      e.preventDefault();
-      this.toggleFullscreen();
-      return true;
-    }
-
-    return false;
-  }
-
-  public async handleResize(_e: Event): Promise<boolean> {
-    this.updateDimensions();
-    return true;
   }
 
   private updateDimensions(): void {
@@ -358,45 +398,5 @@ export class BrianApp implements EventHandler {
         this.showMessage(`Failed to load dataset: ${errorMessage}`, "error");
       }
     });
-  }
-
-  // Public API methods
-  public async addDataset(id: string, name: string, dataset: CdiscDataset): Promise<void> {
-    this.datasetPanel.addDataset(id, id, name, dataset);
-    this.updateStatusBarDatasetInfo();
-    this.updateFocusAfterDatasetChange();
-  }
-
-  // Event system access methods
-  public getEventDispatcher(): EventDispatcher {
-    return this.eventDispatcher;
-  }
-
-  public getFocusManager(): FocusManager {
-    return this.focusManager;
-  }
-
-  public setTheme(theme: "light" | "dark"): void {
-    this.container.classList.remove(`brian-app--${this.theme}`);
-    document.body.classList.remove(`theme-${this.theme}`);
-
-    this.theme = theme;
-    this.container.classList.add(`brian-app--${this.theme}`);
-    document.body.classList.add(`theme-${this.theme}`);
-  }
-
-  public showMessage(message: string, type: "info" | "warning" | "error" = "info"): void {
-    this.statusBar?.showMessage(message, type);
-  }
-
-  public destroy(): void {
-    // Clean up event system
-    this.eventDispatcher.removeGlobalEventHandler(this);
-    this.focusManager.clearFocus();
-    this.focusManager.clearFocusStack();
-
-    this.statusBar?.destroy();
-    this.commandPalette?.destroy();
-    this.container.remove();
   }
 }

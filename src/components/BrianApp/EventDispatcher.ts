@@ -60,10 +60,6 @@ export class EventDispatcher implements IEventDispatcher {
   }
 
   public async dispatchEvent(event: Event): Promise<boolean> {
-    event.stopImmediatePropagation();
-    event.stopPropagation();
-    event.preventDefault();
-
     const result = await this.dispatchEventInternal(event);
     return result.handled;
   }
