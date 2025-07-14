@@ -33,68 +33,48 @@ export class SpreadsheetVisualizerFocusable extends SpreadsheetVisualizer implem
   // Event handler methods that delegate to SpreadsheetVisualizer
   public async handleMouseDown(event: MouseEvent): Promise<boolean> {
     if (!this._isFocused) return false;
-    await this._handleMouseDown(event);
-    return true;
+    return await this._handleMouseDown(event);
   }
 
   public async handleMouseMove(event: MouseEvent): Promise<boolean> {
     if (!this._isFocused) return false;
-    await this._handleMouseMove(event);
-    return true;
+    return await this._handleMouseMove(event);
   }
 
   public async handleMouseUp(event: MouseEvent): Promise<boolean> {
     if (!this._isFocused) return false;
-    await this._handleMouseUp(event);
-    return true;
+    return await this._handleMouseUp(event);
   }
 
   public async handleMouseLeave(event: MouseEvent): Promise<boolean> {
     if (!this._isFocused) return false;
-    await this._handleMouseLeave(event);
-    return true;
+    return await this._handleMouseLeave(event);
   }
 
   public async handleWheel(event: WheelEvent): Promise<boolean> {
     if (!this._isFocused) return false;
-    await this._handleWheel(event);
-    return true;
+    return await this._handleWheel(event);
   }
 
   public async handleKeyDown(event: KeyboardEvent): Promise<boolean> {
     if (!this._isFocused) return false;
-    await this._handleKeyDown(event);
-    return true;
+    return await this._handleKeyDown(event);
   }
 
   public async handleResize(_: Event): Promise<boolean> {
-    await this._handleResize();
-    return true;
+    return await this._handleResize();
   }
 
-  public async handleContextMenu(_: MouseEvent): Promise<boolean> {
+  public async handleContextMenu(event: MouseEvent): Promise<boolean> {
     if (!this._isFocused) return false;
-    // await this._handleContextMenu(event);
+
+    // if (this.contextMenu.isVisible()) {
+    //   this.contextMenu.hide();
+    //   this.eventDispatcher?.setFocus(this.componentId);
+    //   return true;
+    // }
+
+    this.contextMenu.show(event);
     return true;
   }
-
-  // private dispatchEventToSpreadsheet(eventType: string, event: Event): void {
-  //   // Since SpreadsheetVisualizer still has its own event listeners set up,
-  //   // we can dispatch the event to its container to trigger the handlers
-  //   if (
-  //     this.canvas &&
-  //     (eventType === "mousedown" ||
-  //       eventType === "mousemove" ||
-  //       eventType === "mouseup" ||
-  //       eventType === "mouseleave" ||
-  //       eventType === "wheel" ||
-  //       eventType === "contextmenu")
-  //   ) {
-  //     this.canvas.dispatchEvent(new MouseEvent(eventType, event as MouseEvent));
-  //   } else if (eventType === "keydown") {
-  //     document.dispatchEvent(new KeyboardEvent(eventType, event as KeyboardEvent));
-  //   } else if (eventType === "resize") {
-  //     window.dispatchEvent(new Event(eventType));
-  //   }
-  // }
 }

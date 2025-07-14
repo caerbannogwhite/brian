@@ -1,16 +1,24 @@
+import { FocusableComponent } from "../BrianApp/types";
 import { SpreadsheetVisualizer } from "./SpreadsheetVisualizer";
+import { getDefaultBorderColor, getDefaultCellTextColor, getDefaultHeaderBackgroundColor } from "./defaults";
 
 interface MenuItem {
   label: string;
   action: () => void;
 }
 
-export class ContextMenu {
+export class ContextMenu implements FocusableComponent {
+  public readonly componentId: string = "context-menu";
+  public readonly canReceiveFocus: boolean = true;
+
+  private _isVisible: boolean = false;
+  private _isFocused: boolean = false;
   private contextMenu: HTMLElement;
   private menuItems: MenuItem[];
   private spreadsheetVisualizer: SpreadsheetVisualizer;
 
   constructor(spreadsheetVisualizer: SpreadsheetVisualizer) {
+    this._isVisible = false;
     this.spreadsheetVisualizer = spreadsheetVisualizer;
 
     this.contextMenu = document.createElement("div");
@@ -53,6 +61,11 @@ export class ContextMenu {
         menuItem.style.backgroundColor = "transparent";
       });
 
+      menuItem.addEventListener("mousemove", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+      });
+
       menuItem.addEventListener("click", () => {
         item.action();
         this.hide();
@@ -61,10 +74,31 @@ export class ContextMenu {
       this.contextMenu!.appendChild(menuItem);
     });
 
+    this.updateThemeColors();
     document.body.appendChild(this.contextMenu);
   }
 
+  public isVisible(): boolean {
+    return this._isVisible;
+  }
+
+  public focus(): void {
+    this._isFocused = true;
+    this.contextMenu.focus();
+  }
+
+  public blur(): void {
+    this._isFocused = false;
+    this.contextMenu.blur();
+  }
+
+  public isFocused(): boolean {
+    return this._isFocused;
+  }
+
   public async show(event: MouseEvent) {
+    this._isVisible = true;
+
     event.preventDefault();
     event.stopPropagation();
 
@@ -97,6 +131,7 @@ export class ContextMenu {
   }
 
   public hide() {
+    this._isVisible = false;
     if (this.contextMenu) {
       this.contextMenu.style.display = "none";
     }
@@ -188,5 +223,19 @@ export class ContextMenu {
 
     // Remove event listeners
     document.removeEventListener("click", () => this.hide());
+  }
+
+  public updateThemeColors() {
+    const options = this.spreadsheetVisualizer.getOptions();
+
+    this.contextMenu.style.backgroundColor = options.headerBackgroundColor || getDefaultHeaderBackgroundColor();
+    this.contextMenu.style.borderColor = options.borderColor || getDefaultBorderColor();
+    this.contextMenu.style.color = options.cellTextColor || getDefaultCellTextColor();
+
+    this.contextMenu.querySelectorAll("div").forEach((item) => {
+      item.addEventListener("mouseenter", () => {
+        item.style.backgroundColor = options.headerBackgroundColor || getDefaultHeaderBackgroundColor();
+      });
+    });
   }
 }

@@ -118,7 +118,7 @@ export class SpreadsheetVisualizer {
   private statsVisualizer: ColumnStatsVisualizer | null;
 
   // Context menu for export options
-  private contextMenu: ContextMenu;
+  protected contextMenu: ContextMenu;
 
   // Theme management
   private themeCleanup: (() => void) | null = null;
@@ -265,7 +265,6 @@ export class SpreadsheetVisualizer {
     this.totalRows = this.metadata.totalRows;
     this.totalCols = this.metadata.totalColumns;
 
-    this.setupEventListeners();
     await this.updateLayout();
   }
 
@@ -343,9 +342,18 @@ export class SpreadsheetVisualizer {
     return { headers, indeces: rowIndeces, data: formattedData };
   }
 
+  // Public method to trigger resize from external components
+  public async resize(): Promise<void> {
+    await this._handleResize();
+  }
+
   // Accessor methods for wrapper
   public getContainer(): HTMLElement {
     return this.container;
+  }
+
+  public getOptions(): SpreadsheetOptions {
+    return this.options;
   }
 
   private updateThemeColors(): void {
@@ -362,25 +370,8 @@ export class SpreadsheetVisualizer {
     this.options.scrollbarColor = getDefaultScrollbarColor();
     this.options.scrollbarThumbColor = getDefaultScrollbarThumbColor();
     this.options.scrollbarHoverColor = getDefaultScrollbarHoverColor();
-  }
 
-  private setupEventListeners() {
-    // Mouse events
-    this.canvas.addEventListener("mousedown", (event) => this._handleMouseDown(event).catch(console.error));
-    this.canvas.addEventListener("mousemove", (event) => this._handleMouseMove(event).catch(console.error));
-    this.canvas.addEventListener("mouseup", this._handleMouseUp.bind(this));
-    this.canvas.addEventListener("mouseleave", this._handleMouseLeave.bind(this));
-    this.canvas.addEventListener("wheel", (event) => this._handleWheel(event).catch(console.error));
-    this.canvas.addEventListener("contextmenu", (event) => this.contextMenu.show(event).catch(console.error));
-
-    // Keyboard events
-    window.addEventListener("keydown", (event) => this._handleKeyDown(event).catch(console.error));
-
-    // Window events
-    window.addEventListener("resize", () => this._handleResize().catch(console.error));
-
-    // Hide context menu when clicking outside
-    document.addEventListener("click", () => this.contextMenu.hide());
+    this.contextMenu.updateThemeColors();
   }
 
   private async updateLayout() {
@@ -565,7 +556,7 @@ export class SpreadsheetVisualizer {
     this.toDraw = ToDraw.None;
   }
 
-  protected async _handleMouseDown(event: MouseEvent): Promise<void> {
+  protected async _handleMouseDown(event: MouseEvent): Promise<boolean> {
     const rect = this.canvas.getBoundingClientRect();
     const x = event.clientX - rect.left;
     const y = event.clientY - rect.top;
@@ -576,7 +567,7 @@ export class SpreadsheetVisualizer {
       this.dragStartY = y;
       this.lastScrollY = this.scrollY;
 
-      return;
+      return true;
     }
 
     // Horizontal Scrolling
@@ -585,13 +576,13 @@ export class SpreadsheetVisualizer {
       this.dragStartX = x;
       this.lastScrollX = this.scrollX;
 
-      return;
+      return true;
     }
 
     // Column Header
     if (this.isMouseOverColumnHeader(x, y)) {
       const cell = this.getCellAtPosition(x, y);
-      if (!cell) return;
+      if (!cell) return false;
       const { col } = cell;
 
       let hasStatusPanelChanged = false;
@@ -623,7 +614,7 @@ export class SpreadsheetVisualizer {
     // Row Index
     else if (this.isMouseOverRowIndex(x, y)) {
       const cell = this.getCellAtPosition(x, y);
-      if (!cell) return;
+      if (!cell) return false;
       const { row } = cell;
 
       if (this.selectedRows.includes(row)) {
@@ -639,7 +630,7 @@ export class SpreadsheetVisualizer {
     else {
       // Right click is handled by the context menu
       if (event.button === 2) {
-        return;
+        return false;
       }
 
       const cell = this.getCellAtPosition(x, y);
@@ -658,9 +649,10 @@ export class SpreadsheetVisualizer {
     }
 
     await this.draw();
+    return true;
   }
 
-  protected async _handleMouseMove(event: MouseEvent): Promise<void> {
+  protected async _handleMouseMove(event: MouseEvent): Promise<boolean> {
     const rect = this.canvas.getBoundingClientRect();
     const x = event.clientX - rect.left;
     const y = event.clientY - rect.top;
@@ -717,21 +709,24 @@ export class SpreadsheetVisualizer {
     }
 
     await this.draw();
+    return true;
   }
 
-  protected async _handleMouseUp(_: MouseEvent): Promise<void> {
+  protected async _handleMouseUp(_: MouseEvent): Promise<boolean> {
     this.mouseState = MouseState.Idle;
+    return true;
   }
 
-  protected async _handleMouseLeave(_: MouseEvent): Promise<void> {
+  protected async _handleMouseLeave(_: MouseEvent): Promise<boolean> {
     this.hoveredCell = null;
     this.mouseState = MouseState.Idle;
     this.updateToDraw(ToDraw.CellHover);
 
     this.draw();
+    return true;
   }
 
-  protected async _handleWheel(event: WheelEvent): Promise<void> {
+  protected async _handleWheel(event: WheelEvent): Promise<boolean> {
     event.preventDefault();
 
     // Zoom
@@ -750,9 +745,7 @@ export class SpreadsheetVisualizer {
     // Scroll
     else {
       const prevScrollY = this.scrollY;
-      // const prevScrollX = this.scrollX;
       this.scrollY = minMax(this.scrollY + event.deltaY, 0, this.totalScrollY);
-      // this.scrollX = minMax(this.scrollX + event.deltaX, 0, this.totalScrollX);
 
       if (prevScrollY !== this.scrollY) {
         this.updateToDraw(ToDraw.Cells);
@@ -760,10 +753,11 @@ export class SpreadsheetVisualizer {
     }
 
     await this.draw();
+    return true;
   }
 
-  protected async _handleKeyDown(event: KeyboardEvent): Promise<void> {
-    if (!this.selectedCells) return;
+  protected async _handleKeyDown(event: KeyboardEvent): Promise<boolean> {
+    if (!this.selectedCells) return false;
 
     const { startRow, endRow, startCol, endCol } = this.selectedCells;
     const row = event.shiftKey ? endRow : startRow;
@@ -772,6 +766,7 @@ export class SpreadsheetVisualizer {
     const prevScrollY = this.scrollY;
     const prevScrollX = this.scrollX;
 
+    let handled = true;
     switch (event.key) {
       case "ArrowUp":
         this.selectedCells = {
@@ -871,20 +866,21 @@ export class SpreadsheetVisualizer {
         this.updateToDraw(ToDraw.Selection);
         this.notifySelectionChange();
         break;
+
+      default:
+        handled = false;
+        break;
     }
 
     await this.draw();
+    return handled;
   }
 
-  protected async _handleResize(): Promise<void> {
+  protected async _handleResize(): Promise<boolean> {
     await this.updateLayout();
     this.updateToDraw(ToDraw.Cells);
     await this.draw();
-  }
-
-  // Public method to trigger resize from external components
-  public async resize(): Promise<void> {
-    await this._handleResize();
+    return true;
   }
 
   private isMouseOverVerticalScrollbar(x: number, _: number): boolean {
@@ -1092,10 +1088,10 @@ export class SpreadsheetVisualizer {
 
       // Draw hover background
       this.hoverCtx.fillRect(x, y, width, height);
-      
+
       // Draw enhanced border
       this.hoverCtx.strokeRect(x, y, width, height);
-      
+
       // Add inner glow effect
       this.hoverCtx.strokeStyle = this.options.hoverBorderColor || this.options.borderColor;
       this.hoverCtx.lineWidth = 1;
@@ -1125,10 +1121,10 @@ export class SpreadsheetVisualizer {
 
       // Draw hover background
       this.hoverCtx.fillRect(x, 0, width, height);
-      
+
       // Draw enhanced border
       this.hoverCtx.strokeRect(x, 0, width, height);
-      
+
       // Add inner glow effect
       this.hoverCtx.strokeStyle = this.options.hoverBorderColor || this.options.borderColor;
       this.hoverCtx.lineWidth = 1;
@@ -1195,14 +1191,14 @@ export class SpreadsheetVisualizer {
 
           if (x + width > 0 && x < this.canvas.width && y + height > 0 && y < this.canvas.height) {
             this.selectionCtx.fillRect(x, y, width, height);
-            
+
             // Track the bounds for the selection border and handle
             if (row === minRow && col === minCol) {
               selectionBounds = { x, y, width: 0, height: 0 };
             }
             if (row === maxRow && col === maxCol) {
-              selectionBounds.width = (x + width) - selectionBounds.x;
-              selectionBounds.height = (y + height) - selectionBounds.y;
+              selectionBounds.width = x + width - selectionBounds.x;
+              selectionBounds.height = y + height - selectionBounds.y;
             }
           }
         }
@@ -1213,24 +1209,24 @@ export class SpreadsheetVisualizer {
         this.selectionCtx.strokeStyle = this.options.selectionBorderColor || this.options.borderColor;
         this.selectionCtx.lineWidth = 2;
         this.selectionCtx.strokeRect(selectionBounds.x, selectionBounds.y, selectionBounds.width, selectionBounds.height);
-        
+
         // Add inner border for extra emphasis
         this.selectionCtx.lineWidth = 1;
         this.selectionCtx.strokeRect(selectionBounds.x + 1, selectionBounds.y + 1, selectionBounds.width - 2, selectionBounds.height - 2);
-        
+
         // Draw selection handle (dot) in bottom-right corner
         const handleSize = 8;
-        const handleX = selectionBounds.x + selectionBounds.width - handleSize/8;
-        const handleY = selectionBounds.y + selectionBounds.height - handleSize/8;
-        
+        const handleX = selectionBounds.x + selectionBounds.width - handleSize / 8;
+        const handleY = selectionBounds.y + selectionBounds.height - handleSize / 8;
+
         this.selectionCtx.fillStyle = this.options.selectionBorderColor || this.options.borderColor;
         // this.selectionCtx.ellipse(handleX, handleY, handleSize / 2, handleSize / 2, 0, 0, 2 * Math.PI);
         this.selectionCtx.beginPath();
         this.selectionCtx.arc(handleX, handleY, handleSize / 2, 0, 2 * Math.PI);
         this.selectionCtx.fill();
-        
+
         // Add white outline to the handle for better visibility
-        this.selectionCtx.strokeStyle = '#ffffff';
+        this.selectionCtx.strokeStyle = "#ffffff";
         this.selectionCtx.lineWidth = 1;
         this.selectionCtx.stroke();
       }
@@ -1256,10 +1252,10 @@ export class SpreadsheetVisualizer {
 
       // Draw selection background
       this.selectionCtx.fillRect(x, 0, width, height);
-      
+
       // Draw enhanced border
       this.selectionCtx.strokeRect(x, 0, width, height);
-      
+
       // Add inner border for extra emphasis
       this.selectionCtx.lineWidth = 1;
       this.selectionCtx.strokeRect(x + 1, 1, width - 2, height - 2);
