@@ -23,6 +23,7 @@ export class CommandPalette {
   constructor(parent: HTMLElement) {
     this.createElements();
     parent.appendChild(this.container);
+
     this.setupEventListeners();
     this.registerDefaultCommands();
   }
@@ -44,6 +45,7 @@ export class CommandPalette {
   public show(): void {
     this.isVisible = true;
     this.container.style.display = "block";
+    this.overlay.style.display = "block";
     this.input.value = "";
     this.input.focus();
     this.filterCommands();
@@ -54,7 +56,9 @@ export class CommandPalette {
   public hide(): void {
     this.isVisible = false;
     this.container.style.display = "none";
+    this.overlay.style.display = "none";
     this.input.blur();
+
     if (this.onHideCallback) {
       this.onHideCallback();
     }
@@ -72,11 +76,6 @@ export class CommandPalette {
     this.onHideCallback = callback;
   }
 
-  // Accessor methods for wrapper
-  public getContainer(): HTMLElement {
-    return this.container;
-  }
-
   public isVisibleState(): boolean {
     return this.isVisible;
   }
@@ -85,11 +84,16 @@ export class CommandPalette {
     this.container.remove();
   }
 
+  // Accessor methods for wrapper
+  public getContainer(): HTMLElement {
+    return this.container;
+  }
+
   private createElements(): void {
     // Overlay
     this.overlay = document.createElement("div");
     this.overlay.className = "command-palette-overlay";
-    this.overlay.addEventListener("click", () => this.hide());
+    this.overlay.style.display = "none";
 
     // Container
     this.container = document.createElement("div");
@@ -101,14 +105,13 @@ export class CommandPalette {
     this.input.type = "text";
     this.input.className = "command-palette__input";
     this.input.placeholder = "Type a command...";
-    this.input.addEventListener("input", () => this.filterCommands());
-    this.input.addEventListener("keydown", (e) => this._handleKeyDown(e));
 
     // Command list
     this.commandList = document.createElement("div");
     this.commandList.className = "command-palette__list";
 
-    this.container.appendChild(this.overlay);
+    document.body.appendChild(this.overlay);
+
     this.container.appendChild(this.input);
     this.container.appendChild(this.commandList);
   }
@@ -123,10 +126,36 @@ export class CommandPalette {
         this.hide();
       }
     });
+
+    this.overlay.addEventListener("click", (e) => {
+      if (this.isVisible) {
+        e.preventDefault();
+        e.stopPropagation();
+        this.hide();
+      }
+    });
+
+    this.overlay.addEventListener("mousemove", (e) => {
+      if (this.isVisible) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    });
+
+    this.container.addEventListener("mousemove", (e) => {
+      if (this.isVisible) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    });
+
+    this.input.addEventListener("input", () => this.filterCommands());
+    this.input.addEventListener("keydown", (e) => this.handleKeyDown(e));
   }
 
   private filterCommands(): void {
     const query = this.input.value.toLowerCase();
+    console.log("filterCommands", query);
     this.filteredCommands = Array.from(this.commands.values())
       .filter((command) => {
         // Check if command should be shown (when condition)
@@ -209,10 +238,7 @@ export class CommandPalette {
     });
   }
 
-  protected _handleKeyDown(e: KeyboardEvent): void {
-    e.preventDefault();
-    e.stopPropagation();
-
+  private handleKeyDown(e: KeyboardEvent): void {
     switch (e.key) {
       case "ArrowDown":
         e.preventDefault();

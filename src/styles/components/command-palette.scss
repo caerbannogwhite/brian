@@ -5,9 +5,9 @@
   left: 0;
   width: 100%;
   height: 100%;
-  background-color: rgba(0, 0, 0, 0.6);
+  background-color: rgba(0, 0, 0, 0.6) !important;
   z-index: 9998;
-  
+
   // Light theme overlay
   body.theme-light & {
     background-color: rgba(0, 0, 0, 0.2) !important;
@@ -47,7 +47,7 @@
     color: #ffffff;
     padding: 0 16px;
     border-bottom: 1px solid #666666;
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
 
     &::placeholder {
       color: #cccccc;
@@ -82,7 +82,7 @@
     &::-webkit-scrollbar-thumb {
       background-color: #777777;
       border-radius: 4px;
-      
+
       &:hover {
         background-color: #888888;
       }
@@ -91,7 +91,7 @@
     // Light theme scrollbar
     body.theme-light &::-webkit-scrollbar-thumb {
       background-color: #e1e5e9;
-      
+
       &:hover {
         background-color: #d6dade;
       }
@@ -114,7 +114,7 @@
 
     &--selected {
       background-color: #0078d4;
-      
+
       &:hover {
         background-color: #1084e4;
       }
@@ -129,7 +129,7 @@
       &--selected {
         background-color: #0078d4 !important;
         color: #ffffff !important;
-        
+
         &:hover {
           background-color: #106ebe !important;
         }
@@ -141,13 +141,13 @@
       font-weight: 500;
       color: #ffffff;
       margin-bottom: 2px;
-      
+
       // Light theme
       body.theme-light & {
         color: #2c3e50 !important;
         font-weight: 600 !important;
       }
-      
+
       // Selected state
       .command-palette__item--selected & {
         color: #ffffff;
@@ -160,12 +160,12 @@
       gap: 12px;
       font-size: 11px;
       color: #dddddd;
-      
+
       // Light theme
       body.theme-light & {
         color: #6c757d !important;
       }
-      
+
       // Selected state
       .command-palette__item--selected & {
         color: rgba(255, 255, 255, 0.9);
@@ -185,16 +185,16 @@
       padding: 2px 6px;
       border-radius: 3px;
       font-size: 10px;
-      font-family: 'Consolas', 'Monaco', monospace;
+      font-family: "Consolas", "Monaco", monospace;
       border: 1px solid #777777;
-      
+
       // Light theme
       body.theme-light & {
         background-color: #f1f3f4 !important;
         color: #495057 !important;
         border: 1px solid #e1e5e9 !important;
       }
-      
+
       // Selected state
       .command-palette__item--selected & {
         background-color: rgba(255, 255, 255, 0.25);
@@ -210,7 +210,7 @@
     color: #dddddd;
     font-size: 12px;
     font-style: italic;
-    
+
     // Light theme
     body.theme-light & {
       color: #6c757d !important;
@@ -236,20 +236,20 @@
     top: 5%;
     width: 95vw;
     max-height: 70vh;
-    
+
     &__input {
       font-size: 16px; // Prevent zoom on iOS
       height: 44px;
     }
-    
+
     &__item {
       padding: 12px 16px;
       min-height: 44px;
-      
+
       &-title {
         font-size: 14px;
       }
-      
+
       &-details {
         font-size: 12px;
       }
@@ -261,7 +261,7 @@
 @media (prefers-contrast: high) {
   .command-palette {
     border-width: 2px;
-    
+
     &__item {
       &--selected {
         background-color: #0078d4;
@@ -277,8 +277,8 @@
   .command-palette {
     animation: none;
   }
-  
+
   .command-palette__item {
     transition: none;
   }
-} 
+}
