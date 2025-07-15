@@ -1,5 +1,5 @@
 import "./styles/main.scss";
-import { datasetDm, datasetAe, datasetDmMini, datasetDmShort } from "./data.ts";
+import { datasetDm } from "./data.ts";
 import { BrianApp } from "./components/BrianApp";
 import { type CdiscDataset } from "./data/types";
 
@@ -32,9 +32,9 @@ async function initApplication() {
   if (loadSampleData) {
     try {
       await brianApp.addDataset("dm", "Demographics", datasetDm as CdiscDataset);
-      await brianApp.addDataset("dmMini", "Demographics Mini", datasetDmMini as CdiscDataset);
-      await brianApp.addDataset("dmShort", "Demographics Short", datasetDmShort as CdiscDataset);
-      await brianApp.addDataset("ae", "Adverse Events", datasetAe as CdiscDataset);
+      // await brianApp.addDataset("dmMini", "Demographics Mini", datasetDmMini as CdiscDataset);
+      // await brianApp.addDataset("dmShort", "Demographics Short", datasetDmShort as CdiscDataset);
+      // await brianApp.addDataset("ae", "Adverse Events", datasetAe as CdiscDataset);
 
       brianApp.showMessage("Sample datasets loaded successfully", "info");
     } catch (error) {
