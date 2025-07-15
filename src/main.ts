@@ -1,5 +1,5 @@
 import "./styles/main.scss";
-import { datasetDm, datasetAe, datasetDmMini, datasetDmShort } from "./data.ts";
+import { datasetDm, datasetDmMini, datasetDmShort, datasetAe } from "./data.ts";
 import { BrianApp } from "./components/BrianApp";
 import { type CdiscDataset } from "./data/types";
 

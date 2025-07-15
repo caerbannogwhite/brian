@@ -46,7 +46,7 @@ export class ColumnStatsVisualizer {
     this.container.style.display = "block";
     this.container.classList.add("visible");
     await this.calculateStats();
-    this.render();
+    await this.render();
   }
 
   public hide() {
@@ -100,7 +100,7 @@ export class ColumnStatsVisualizer {
     return this.container;
   }
 
-  private render() {
+  private async render() {
     if (!this.currentColumn || !this.stats) return;
 
     this.container.innerHTML = `
@@ -111,9 +111,9 @@ export class ColumnStatsVisualizer {
           <div class="column-stats__type">${this.currentColumn.dataType}</div>
         </div>
         <div class="column-stats__container">
-          ${this.renderStats()}
+          ${await this.renderStats()}
         </div>
-        ${this.renderVisualization()}
+        ${await this.renderVisualization()}
       </div>
     `;
   }
@@ -179,11 +179,16 @@ export class ColumnStatsVisualizer {
     return stats.join("");
   }
 
-  private renderVisualization() {
-    if (!this.stats || !this.stats.valueCounts) return "";
+  private async renderVisualization() {
+    if (!this.stats) return "";
+
+    // For numerical data, show distribution histogram
+    if (this.currentColumn?.dataType === "integer" || this.currentColumn?.dataType === "float") {
+      return await this.renderNumericalHistogram();
+    }
 
     // For categorical data, show horizontal histogram of top 10 values
-    if (this.currentColumn?.dataType !== "integer" && this.currentColumn?.dataType !== "float") {
+    if (this.stats.valueCounts) {
       const sortedCounts = Array.from(this.stats.valueCounts.entries()).sort((a, b) => b[1] - a[1]);
       const top10 = sortedCounts.slice(0, 10);
 
@@ -218,5 +223,78 @@ export class ColumnStatsVisualizer {
     }
 
     return "";
+  }
+
+  private async renderNumericalHistogram() {
+    if (!this.currentColumn || !this.spreadsheetVisualizer || !this.stats) return "";
+
+    const values = await this.spreadsheetVisualizer.getColumnValues(this.currentColumn.key);
+    const numbers = values.map((v) => Number(v.raw)).filter((v) => v !== null && !isNaN(v));
+    
+    if (numbers.length === 0) return "";
+
+    const binCount = Math.min(10, Math.max(5, Math.ceil(Math.sqrt(numbers.length))));
+    const min = this.stats.min!;
+    const max = this.stats.max!;
+    const binWidth = (max - min) / binCount;
+
+    // Create bins
+    const bins = Array.from({ length: binCount }, (_, i) => ({
+      start: min + i * binWidth,
+      end: min + (i + 1) * binWidth,
+      count: 0,
+      label: this.formatBinLabel(min + i * binWidth, min + (i + 1) * binWidth, i === binCount - 1)
+    }));
+
+    // Count values in each bin
+    numbers.forEach(value => {
+      const binIndex = Math.min(Math.floor((value - min) / binWidth), binCount - 1);
+      bins[binIndex].count++;
+    });
+
+    const maxCount = Math.max(...bins.map(bin => bin.count));
+    const totalValidValues = this.stats.totalCount - this.stats.nullCount;
+
+    return `
+      <div class="histogram__container">
+        <div class="histogram__title">Distribution</div>
+        <div class="histogram__chart histogram__chart--numerical">
+          ${bins.map(bin => {
+            // const percentage = ((bin.count / totalValidValues) * 100).toFixed(1);
+            const height = maxCount > 0 ? (bin.count / maxCount) * 100 : 0;
+            return `
+              <div class="histogram__numerical-bar">
+                <div class="histogram__numerical-bar-fill" style="height: ${height}%"></div>
+                <div class="histogram__numerical-count">${bin.count}</div>
+                <div class="histogram__numerical-label" title="${bin.label}">${bin.label}</div>
+              </div>
+            `;
+          }).join("")}
+        </div>
+      </div>
+    `;
+  }
+
+  private formatBinLabel(start: number, end: number, isLast: boolean): string {
+    const formatNumber = (num: number) => {
+      if (Math.abs(num) >= 1000000) {
+        return (num / 1000000).toFixed(1) + "M";
+      } else if (Math.abs(num) >= 1000) {
+        return (num / 1000).toFixed(1) + "K";
+      } else if (num % 1 === 0) {
+        return num.toString();
+      } else {
+        return num.toFixed(1);
+      }
+    };
+
+    const startStr = formatNumber(start);
+    const endStr = formatNumber(end);
+    
+    if (isLast) {
+      return `[${startStr}, ${endStr}]`;
+    } else {
+      return `[${startStr}, ${endStr})`;
+    }
   }
 }
