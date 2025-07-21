@@ -272,7 +272,6 @@
     flex: 1;
     height: 16px;
     background: #e9ecef;
-    border-radius: 4px;
     position: relative;
     min-width: 0;
 
@@ -290,8 +289,7 @@
   &__bar-fill {
     height: 100%;
     background: #0078d4;
-    border-radius: 4px;
-    transition: width 0.3s ease-out;
+    // transition: width 0.3s ease-out;
 
     // Dark theme
     body.theme-dark & {
@@ -366,30 +364,6 @@
     // Dark theme
     body.theme-dark & {
       color: #cccccc;
-    }
-
-    // Light theme
-    body.theme-light & {
-      color: #6c757d;
-    }
-  }
-
-  &__numerical-label {
-    font-size: 0.6rem;
-    color: #6c757d;
-    text-align: center;
-    transform: rotate(-45deg);
-    transform-origin: center;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    max-width: 40px;
-    line-height: 1;
-    margin-top: 2px;
-
-    // Dark theme
-    body.theme-dark & {
-      color: #999999;
     }
 
     // Light theme

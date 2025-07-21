@@ -1,6 +1,8 @@
 import { SpreadsheetVisualizer } from "../SpreadsheetVisualizer/SpreadsheetVisualizer";
 import { Column } from "../SpreadsheetVisualizer/types";
 
+const BIN_NUMBER = 100;
+
 interface ColumnStats {
   min?: number;
   max?: number;
@@ -17,6 +19,9 @@ export class ColumnStatsVisualizer {
   private spreadsheetVisualizer: SpreadsheetVisualizer | null = null;
   private currentColumn: Column | null = null;
   private stats: ColumnStats | null = null;
+  private numbers: number[] = [];
+  private numbersSorted: number[] = [];
+  private isLoading: boolean = false;
 
   constructor(parent: HTMLElement, spreadsheetVisualizer: SpreadsheetVisualizer | null, statsPanelWidth: number) {
     this.container = document.createElement("div");
@@ -66,24 +71,25 @@ export class ColumnStatsVisualizer {
     };
 
     if (this.currentColumn.dataType === "integer" || this.currentColumn.dataType === "float") {
-      const numbers = values.map((v) => Number(v.raw)).filter((v) => v !== null && !isNaN(v));
-      if (numbers.length > 0) {
-        this.stats.min = Math.min(...numbers);
-        this.stats.max = Math.max(...numbers);
-        this.stats.mean = numbers.reduce((a, b) => a + b, 0) / numbers.length;
+      this.numbers = values.map((v) => Number(v.raw)).filter((v) => v !== null && !isNaN(v));
+      if (this.numbers.length > 0) {
+        this.stats.min = Math.min(...this.numbers);
+        this.stats.max = Math.max(...this.numbers);
+        this.stats.mean = this.numbers.reduce((a, b) => a + b, 0) / this.numbers.length;
 
         // Calculate median
-        const sorted = [...numbers].sort((a, b) => a - b);
-        const mid = Math.floor(sorted.length / 2);
-        this.stats.median = sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid];
+        this.numbersSorted = [...this.numbers].sort((a, b) => a - b);
+        const mid = Math.floor(this.numbersSorted.length / 2);
+        this.stats.median =
+          this.numbersSorted.length % 2 === 0 ? (this.numbersSorted[mid - 1] + this.numbersSorted[mid]) / 2 : this.numbersSorted[mid];
 
         // Calculate standard deviation
         const mean = this.stats.mean;
-        const squareDiffs = numbers.map((value) => {
+        const squareDiffs = this.numbers.map((value) => {
           const diff = value - mean;
           return diff * diff;
         });
-        this.stats.stdDev = Math.sqrt(squareDiffs.reduce((a, b) => a + b, 0) / numbers.length);
+        this.stats.stdDev = Math.sqrt(squareDiffs.reduce((a, b) => a + b, 0) / this.numbers.length);
       }
     } else {
       // For categorical data, count occurrences
@@ -94,6 +100,30 @@ export class ColumnStatsVisualizer {
         }
       });
     }
+  }
+
+  private computeHistogram() {
+    if (this.numbers.length === 0) return { bins: [], maxCount: 0 };
+    if (this.stats!.max! <= this.stats!.min!) return { bins: [], maxCount: 0 };
+
+    const binWidth = (this.stats!.max! - this.stats!.min!) / BIN_NUMBER;
+
+    // Create bins
+    const bins = Array.from({ length: BIN_NUMBER }, (_, i) => ({
+      start: this.stats!.min! + i * binWidth,
+      end: this.stats!.min! + (i + 1) * binWidth,
+      count: 0,
+    }));
+
+    // Count values in each bin
+    this.numbers.forEach((value) => {
+      const binIndex = Math.min(Math.floor((value - this.stats!.min!) / binWidth), BIN_NUMBER - 1);
+      bins[binIndex].count++;
+    });
+
+    const maxCount = Math.max(...bins.map((bin) => bin.count));
+
+    return { bins, maxCount };
   }
 
   public getContainer(): HTMLElement {
@@ -226,75 +256,26 @@ export class ColumnStatsVisualizer {
   }
 
   private async renderNumericalHistogram() {
-    if (!this.currentColumn || !this.spreadsheetVisualizer || !this.stats) return "";
+    const { bins, maxCount } = this.computeHistogram();
 
-    const values = await this.spreadsheetVisualizer.getColumnValues(this.currentColumn.key);
-    const numbers = values.map((v) => Number(v.raw)).filter((v) => v !== null && !isNaN(v));
-    
-    if (numbers.length === 0) return "";
-
-    const binCount = Math.min(10, Math.max(5, Math.ceil(Math.sqrt(numbers.length))));
-    const min = this.stats.min!;
-    const max = this.stats.max!;
-    const binWidth = (max - min) / binCount;
-
-    // Create bins
-    const bins = Array.from({ length: binCount }, (_, i) => ({
-      start: min + i * binWidth,
-      end: min + (i + 1) * binWidth,
-      count: 0,
-      label: this.formatBinLabel(min + i * binWidth, min + (i + 1) * binWidth, i === binCount - 1)
-    }));
-
-    // Count values in each bin
-    numbers.forEach(value => {
-      const binIndex = Math.min(Math.floor((value - min) / binWidth), binCount - 1);
-      bins[binIndex].count++;
-    });
-
-    const maxCount = Math.max(...bins.map(bin => bin.count));
-    const totalValidValues = this.stats.totalCount - this.stats.nullCount;
+    if (maxCount === 0) return "";
 
     return `
       <div class="histogram__container">
         <div class="histogram__title">Distribution</div>
         <div class="histogram__chart histogram__chart--numerical">
-          ${bins.map(bin => {
-            // const percentage = ((bin.count / totalValidValues) * 100).toFixed(1);
-            const height = maxCount > 0 ? (bin.count / maxCount) * 100 : 0;
-            return `
+          ${bins
+            .map((bin) => {
+              const height = maxCount > 0 ? (bin.count / maxCount) * 100 : 0;
+              return `
               <div class="histogram__numerical-bar">
                 <div class="histogram__numerical-bar-fill" style="height: ${height}%"></div>
-                <div class="histogram__numerical-count">${bin.count}</div>
-                <div class="histogram__numerical-label" title="${bin.label}">${bin.label}</div>
               </div>
             `;
-          }).join("")}
+            })
+            .join("")}
         </div>
       </div>
     `;
-  }
-
-  private formatBinLabel(start: number, end: number, isLast: boolean): string {
-    const formatNumber = (num: number) => {
-      if (Math.abs(num) >= 1000000) {
-        return (num / 1000000).toFixed(1) + "M";
-      } else if (Math.abs(num) >= 1000) {
-        return (num / 1000).toFixed(1) + "K";
-      } else if (num % 1 === 0) {
-        return num.toString();
-      } else {
-        return num.toFixed(1);
-      }
-    };
-
-    const startStr = formatNumber(start);
-    const endStr = formatNumber(end);
-    
-    if (isLast) {
-      return `[${startStr}, ${endStr}]`;
-    } else {
-      return `[${startStr}, ${endStr})`;
-    }
   }
 }
