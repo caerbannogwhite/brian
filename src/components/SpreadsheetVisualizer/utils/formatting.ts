@@ -7,7 +7,8 @@ import {
   getDefaultDatetimeStyle,
   getDefaultNullStyle,
 } from "../defaults";
-import { SpreadsheetOptions, DataType } from "../types";
+import { SpreadsheetOptions } from "../types";
+import { DataType } from "../../../data/types";
 import { ColumnInternal, CellStyle } from "../internals";
 
 export function parseFormat(format: string | undefined, type: DataType): any {

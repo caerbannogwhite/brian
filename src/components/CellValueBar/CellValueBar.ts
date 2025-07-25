@@ -1,4 +1,4 @@
-import { Column } from "../SpreadsheetVisualizer";
+import { Column } from "../../data/types";
 
 export interface CellValueBarOptions {
   container: HTMLElement;

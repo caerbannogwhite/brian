@@ -1,19 +1,17 @@
 import { SpreadsheetVisualizerFocusable } from "../SpreadsheetVisualizer/SpreadsheetVisualizerFocusable";
-import { DataProvider } from "../SpreadsheetVisualizer/types";
 import { SpreadsheetOptions } from "../SpreadsheetVisualizer/types";
 import { ColumnStatsVisualizerFocusable } from "../ColumnStatsVisualizer/ColumnStatsVisualizerFocusable";
-import { DragDropZoneFocusable } from "../DragDropZone/DragDropZoneFocusable";
 import { CellValueBar } from "../CellValueBar";
-import { CdiscDataset } from "../../data/types";
+import { DataProvider, DatasetMetadata } from "../../data/types";
 import { EventDispatcher } from "../BrianApp/EventDispatcher";
 
 interface DatasetTab {
-  id: string;
-  name: string;
+  metadata: DatasetMetadata;
   dataProvider: DataProvider;
   spreadsheetVisualizer: SpreadsheetVisualizerFocusable;
   container: HTMLElement;
   isActive: boolean;
+  onCloseTab?: () => void;
 }
 
 export class MultiDatasetVisualizer {
@@ -25,10 +23,9 @@ export class MultiDatasetVisualizer {
   private activeTabId: string | null = null;
   private options: SpreadsheetOptions;
   private sharedStatsVisualizer: ColumnStatsVisualizerFocusable;
-  private dragDropZone: DragDropZoneFocusable | null = null;
   private cellValueBar: CellValueBar | null = null;
-  // private onFileDropped?: (dataset: CdiscDataset, fileName: string) => void;
   private eventDispatcher?: EventDispatcher;
+  private onCloseTabCallback?: () => void;
 
   constructor(parent: HTMLElement, options: SpreadsheetOptions = {}) {
     this.container = document.createElement("div");
@@ -68,12 +65,9 @@ export class MultiDatasetVisualizer {
 
     // Setup resize handling
     this.setupResizeHandling();
-
-    // Show drag-drop zone initially since no datasets are loaded
-    this.showEmptyState();
   }
 
-  public async addDataset(id: string, name: string, dataProvider: DataProvider): Promise<void> {
+  public async addDataset(metadata: DatasetMetadata, dataProvider: DataProvider): Promise<void> {
     // Create a separate container for this dataset's spreadsheet visualizer
     const datasetContainer = document.createElement("div");
     datasetContainer.className = "multi-dataset-visualizer__dataset-container";
@@ -115,7 +109,7 @@ export class MultiDatasetVisualizer {
       datasetContainer,
       dataProvider,
       spreadsheetOptions,
-      `spreadsheet-${id}`
+      `spreadsheet-${metadata.name}`
     );
 
     // Connect selection change to cell value bar
@@ -128,8 +122,7 @@ export class MultiDatasetVisualizer {
     });
 
     const tab: DatasetTab = {
-      id,
-      name,
+      metadata,
       dataProvider,
       spreadsheetVisualizer,
       container: datasetContainer,
@@ -149,21 +142,20 @@ export class MultiDatasetVisualizer {
 
     // If this is the first tab, activate it and hide empty state
     if (this.tabs.length === 1) {
-      this.hideEmptyState();
       this.showCellValueBar();
-      await this.activateTab(id);
+      await this.activateTab(metadata.name);
     }
   }
 
   public async switchToDataset(id: string): Promise<void> {
-    const tab = this.tabs.find((t) => t.id === id);
+    const tab = this.tabs.find((t) => t.metadata.name === id);
     if (tab) {
       this.activateTab(id);
     }
   }
 
-  public closeDataset(id: string): void {
-    const tabIndex = this.tabs.findIndex((t) => t.id === id);
+  public closeDataset(name: string): void {
+    const tabIndex = this.tabs.findIndex((t) => t.metadata.name === name);
     if (tabIndex === -1) return;
 
     const tab = this.tabs[tabIndex];
@@ -174,7 +166,7 @@ export class MultiDatasetVisualizer {
     }
 
     // Remove tab element
-    const tabElement = this.tabsContainer.querySelector(`[data-tab-id="${id}"]`);
+    const tabElement = this.tabsContainer.querySelector(`[data-tab-id="${name}"]`);
     if (tabElement) {
       tabElement.remove();
     }
@@ -189,7 +181,7 @@ export class MultiDatasetVisualizer {
     if (tab.isActive) {
       if (this.tabs.length > 0) {
         const newActiveTab = tabIndex < this.tabs.length ? this.tabs[tabIndex] : this.tabs[tabIndex - 1];
-        this.activateTab(newActiveTab.id);
+        this.activateTab(newActiveTab.metadata.name);
       } else {
         this.activeTabId = null;
         this.contentContainer.innerHTML = "";
@@ -197,13 +189,12 @@ export class MultiDatasetVisualizer {
         this.sharedStatsVisualizer.hide();
         // Hide cell value bar when no datasets remain
         this.hideCellValueBar();
-        // Show empty state when no datasets remain
-        this.showEmptyState();
       }
     }
 
-    // Clean up spreadsheet visualizer
-    // Note: You might want to add a cleanup method to SpreadsheetVisualizer
+    if (this.onCloseTabCallback) {
+      this.onCloseTabCallback();
+    }
   }
 
   public getActiveDatasetId(): string | null {
@@ -211,11 +202,7 @@ export class MultiDatasetVisualizer {
   }
 
   public getDatasetIds(): string[] {
-    return this.tabs.map((t) => t.id);
-  }
-
-  public setOnFileDroppedCallback(_: (dataset: CdiscDataset, fileName: string) => void): void {
-    // this.onFileDropped = callback;
+    return this.tabs.map((t) => t.metadata.name);
   }
 
   public setEventDispatcher(eventDispatcher: EventDispatcher): void {
@@ -227,14 +214,18 @@ export class MultiDatasetVisualizer {
     }
   }
 
+  public setOnCloseTabCallback(callback: () => void): void {
+    this.onCloseTabCallback = callback;
+  }
+
   private createTabElement(tab: DatasetTab): void {
     const tabElement = document.createElement("div");
-    tabElement.setAttribute("data-tab-id", tab.id);
+    tabElement.setAttribute("data-tab-id", tab.metadata.name);
     tabElement.className = "multi-dataset-visualizer__tab";
 
     // Tab title
     const titleElement = document.createElement("span");
-    titleElement.textContent = tab.name;
+    titleElement.textContent = tab.metadata.name;
     titleElement.className = "multi-dataset-visualizer__tab-title";
 
     // Close button
@@ -245,13 +236,13 @@ export class MultiDatasetVisualizer {
     // Event listeners
     tabElement.addEventListener("click", (e) => {
       if (e.target !== closeButton) {
-        this.activateTab(tab.id);
+        this.activateTab(tab.metadata.name);
       }
     });
 
     closeButton.addEventListener("click", (e) => {
       e.stopPropagation();
-      this.closeDataset(tab.id);
+      this.closeDataset(tab.metadata.name);
     });
 
     tabElement.appendChild(titleElement);
@@ -262,7 +253,7 @@ export class MultiDatasetVisualizer {
   private async activateTab(id: string): Promise<void> {
     // Deactivate current tab
     if (this.activeTabId) {
-      const currentTab = this.tabs.find((t) => t.id === this.activeTabId);
+      const currentTab = this.tabs.find((t) => t.metadata.name === this.activeTabId);
       if (currentTab) {
         currentTab.isActive = false;
         currentTab.container.classList.remove("multi-dataset-visualizer__dataset-container--active");
@@ -271,7 +262,7 @@ export class MultiDatasetVisualizer {
     }
 
     // Activate new tab
-    const newTab = this.tabs.find((t) => t.id === id);
+    const newTab = this.tabs.find((t) => t.metadata.name === id);
     if (newTab) {
       newTab.isActive = true;
       this.activeTabId = id;
@@ -341,45 +332,10 @@ export class MultiDatasetVisualizer {
     // Hide shared stats visualizer
     this.sharedStatsVisualizer.hide();
 
-    // Clean up drag drop zone
-    if (this.dragDropZone) {
-      this.dragDropZone.destroy();
-      this.dragDropZone = null;
-    }
-
     // Clean up cell value bar
     if (this.cellValueBar) {
       this.cellValueBar.destroy();
       this.cellValueBar = null;
-    }
-  }
-
-  private showEmptyState(): void {
-    if (!this.dragDropZone) {
-      this.dragDropZone = new DragDropZoneFocusable(this.contentContainer);
-
-      // Create wrapper and register with event dispatcher
-      if (this.eventDispatcher) {
-        this.eventDispatcher.registerComponent(this.dragDropZone);
-        this.eventDispatcher.setFocus(this.dragDropZone.componentId);
-      }
-    } else {
-      this.dragDropZone.show();
-      // Set focus when showing again
-      if (this.eventDispatcher && this.dragDropZone) {
-        this.eventDispatcher.setFocus(this.dragDropZone.componentId);
-      }
-    }
-  }
-
-  private hideEmptyState(): void {
-    if (this.dragDropZone) {
-      this.dragDropZone.hide();
-    }
-
-    // Unregister from event dispatcher when hiding
-    if (this.eventDispatcher && this.dragDropZone) {
-      this.eventDispatcher.unregisterComponent(this.dragDropZone.componentId);
     }
   }
 

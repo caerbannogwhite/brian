@@ -41,7 +41,8 @@ import {
   DEFAULT_DATETIME_LOCALE,
 } from "./defaults";
 import { listenForThemeChanges } from "./utils/theme";
-import { Column, SpreadsheetOptions, DataProvider, DatasetMetadata } from "./types";
+import { SpreadsheetOptions } from "./types";
+import { DataProvider, DatasetMetadata, Column } from "../../data/types";
 import { ColumnInternal } from "./internals";
 import { minMax } from "./utils/drawing";
 import { ColumnStatsVisualizer } from "../ColumnStatsVisualizer/ColumnStatsVisualizer";

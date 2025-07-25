@@ -1,26 +1,3 @@
-export type DataType = "null" | "boolean" | "integer" | "float" | "string" | "date" | "datetime";
-
-export interface Column {
-  name: string;
-  key: string;
-  label?: string;
-  dataType: DataType;
-  length?: number;
-  format?: string | Intl.NumberFormatOptions;
-}
-
-export interface DatasetMetadata {
-  name: string;
-  fileName?: string;
-  description?: string;
-  totalRows: number;
-  totalColumns: number;
-  columns: Column[];
-}
-export interface DataProvider {
-  getMetadata(): Promise<DatasetMetadata>;
-  fetchData(startRow: number, endRow: number, startCol: number, endCol: number): Promise<any[][]>;
-}
 export interface SpreadsheetOptions {
   // Viewport options
   maxHeight?: number;

@@ -8,7 +8,7 @@
     "Helvetica Neue", sans-serif;
 
   &__panel {
-    width: 300px;
+    width: 280px;
     height: 100%;
     background: linear-gradient(180deg, #ffffff 0%, #fafbfc 100%);
     border-right: 1px solid #e8ecf0;
@@ -29,8 +29,8 @@
       width: 52px;
 
       .dataset-panel__header {
-        padding: 16px 12px;
-        justify-content: center;
+        justify-content: flex-end;
+        padding: 6px 8px;
       }
 
       .dataset-panel__title {
@@ -50,8 +50,8 @@
   &__header {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    padding: 12px 16px;
+    justify-content: flex-end;
+    padding: 6px 8px;
     background: linear-gradient(180deg, #fafbfc 0%, #f5f7fa 100%);
     border-bottom: 1px solid #e8ecf0;
     min-height: 36px;

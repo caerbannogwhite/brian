@@ -1,8 +1,8 @@
 import { parseFile, isSupportedFileType, getSupportedFileTypes } from "../../data/fileParser";
-import { CdiscDataset } from "../../data/types";
+import { DataProvider } from "../../data/types";
 
 export interface DragDropZoneOptions {
-  onFileDropped?: (dataset: CdiscDataset, fileName: string) => void;
+  onFileDropped?: (dataset: DataProvider) => void;
   onError?: (error: string) => void;
 }
 
@@ -48,6 +48,10 @@ export class DragDropZone {
     return this.container;
   }
 
+  public setOnFileDroppedCallback(callback: (dataset: DataProvider) => void): void {
+    this.options.onFileDropped = callback;
+  }
+
   private createDropZone(): void {
     this.dropZone = document.createElement("div");
     this.dropZone.className = "drag-drop-zone__area";
@@ -72,7 +76,7 @@ export class DragDropZone {
     const description = document.createElement("p");
     description.className = "drag-drop-zone__description";
     description.innerHTML = `
-      Drop a CSV, TSV, or TXT file here to automatically add it as a dataset<br>
+      Drop a CSV or TSV file here to automatically add it as a dataset<br>
       <small>Supported formats: ${getSupportedFileTypes().join(", ")}</small>
     `;
 
@@ -166,7 +170,7 @@ export class DragDropZone {
     const file = files[0];
 
     if (!isSupportedFileType(file)) {
-      this.showError(`Unsupported file type: ${file.type || "unknown"}. Please use CSV, TSV, or TXT files.`);
+      this.showError(`Unsupported file type: ${file.type || "unknown"}. Please use CSV or TSV files.`);
       return;
     }
 
@@ -178,7 +182,7 @@ export class DragDropZone {
       this.hideLoading();
 
       if (this.options.onFileDropped) {
-        this.options.onFileDropped(result.dataset, result.parseInfo.fileName);
+        this.options.onFileDropped(result);
       }
     } catch (error) {
       this.hideLoading();

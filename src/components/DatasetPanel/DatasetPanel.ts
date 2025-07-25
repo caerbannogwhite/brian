@@ -1,12 +1,9 @@
-import { CdiscDataProvider } from "../../data/providers/CdiscDataProvider";
-import { type CdiscDataset } from "../../data/types";
+import { DataProvider, DatasetMetadata } from "../../data/types";
 import { MultiDatasetVisualizer } from "../MultiDatasetVisualizer";
 
 interface DatasetInfo {
-  id: string;
-  name: string;
-  label: string;
-  dataset: CdiscDataset;
+  metadata: DatasetMetadata;
+  dataset: DataProvider;
   isLoaded: boolean;
 }
 
@@ -20,6 +17,7 @@ export class DatasetPanel {
   private multiDatasetVisualizer: MultiDatasetVisualizer;
   private isMinimized: boolean = false;
   private onToggleCallback?: (isMinimized: boolean) => void;
+  private onSelectCallback?: (dataset: DataProvider) => void;
 
   constructor(parent: HTMLElement, multiDatasetVisualizer: MultiDatasetVisualizer) {
     this.multiDatasetVisualizer = multiDatasetVisualizer;
@@ -36,16 +34,11 @@ export class DatasetPanel {
     this.headerElement = document.createElement("div");
     this.headerElement.className = "dataset-panel__header";
 
-    const titleElement = document.createElement("h3");
-    titleElement.className = "dataset-panel__title";
-    titleElement.textContent = "Datasets";
-
     this.toggleButton = document.createElement("button");
     this.toggleButton.className = "dataset-panel__toggle";
     this.toggleButton.innerHTML = "−";
     this.toggleButton.title = "Minimize panel";
 
-    this.headerElement.appendChild(titleElement);
     this.headerElement.appendChild(this.toggleButton);
 
     // Create content area
@@ -69,15 +62,15 @@ export class DatasetPanel {
     this.setupEventListeners();
   }
 
-  public addDataset(id: string, name: string, label: string, dataset: CdiscDataset): void {
+  public async addDataset(dataset: DataProvider): Promise<void> {
+    const metadata = await dataset.getMetadata();
+
     // Check if dataset already exists
-    const existingDataset = this.datasets.find((d) => d.id === id);
+    const existingDataset = this.datasets.find((d) => d.metadata.name === metadata.name);
     if (existingDataset) return;
 
     const datasetInfo: DatasetInfo = {
-      id,
-      name,
-      label,
+      metadata,
       dataset,
       isLoaded: false,
     };
@@ -86,16 +79,16 @@ export class DatasetPanel {
     this.renderDatasetList();
   }
 
-  public markDatasetAsLoaded(id: string): void {
-    const dataset = this.datasets.find((d) => d.id === id);
+  public markDatasetAsLoaded(name: string): void {
+    const dataset = this.datasets.find((d) => d.metadata.name === name);
     if (dataset) {
       dataset.isLoaded = true;
       this.renderDatasetList();
     }
   }
 
-  public markDatasetAsUnloaded(id: string): void {
-    const dataset = this.datasets.find((d) => d.id === id);
+  public markDatasetAsUnloaded(name: string): void {
+    const dataset = this.datasets.find((d) => d.metadata.name === name);
     if (dataset) {
       dataset.isLoaded = false;
       this.renderDatasetList();
@@ -103,7 +96,7 @@ export class DatasetPanel {
   }
 
   public getLoadedDatasets(): string[] {
-    return this.datasets.filter((d) => d.isLoaded).map((d) => d.id);
+    return this.datasets.filter((d) => d.isLoaded).map((d) => d.metadata.name);
   }
 
   public getAvailableDatasets(): DatasetInfo[] {
@@ -112,6 +105,10 @@ export class DatasetPanel {
 
   public setOnToggleCallback(callback: (isMinimized: boolean) => void): void {
     this.onToggleCallback = callback;
+  }
+
+  public setOnSelectCallback(callback: (dataset: DataProvider) => void): void {
+    this.onSelectCallback = callback;
   }
 
   public getIsMinimized(): boolean {
@@ -137,6 +134,10 @@ export class DatasetPanel {
     }
   }
 
+  public destroy(): void {
+    this.container.remove();
+  }
+
   private setupEventListeners(): void {
     this.toggleButton.addEventListener("click", () => {
       this.toggleMinimize();
@@ -156,10 +157,9 @@ export class DatasetPanel {
 
       const nameElement = document.createElement("div");
       nameElement.className = "dataset-panel__item-name";
-      nameElement.textContent = datasetInfo.name.toUpperCase();
+      nameElement.textContent = datasetInfo.metadata.name.toUpperCase();
 
       textElement.appendChild(nameElement);
-
       itemElement.appendChild(textElement);
 
       // Add click handler if not already loaded
@@ -167,6 +167,11 @@ export class DatasetPanel {
         itemElement.style.cursor = "pointer";
         itemElement.addEventListener("click", async () => {
           await this.loadDataset(datasetInfo);
+
+          // Call the callback if it exists
+          if (this.onSelectCallback) {
+            this.onSelectCallback(datasetInfo.dataset);
+          }
         });
       }
 
@@ -177,16 +182,16 @@ export class DatasetPanel {
   private async loadDataset(datasetInfo: DatasetInfo): Promise<void> {
     try {
       // Create data provider
-      const dataProvider = new CdiscDataProvider(datasetInfo.dataset);
+      const dataProvider = datasetInfo.dataset;
 
       // Add to multi-dataset visualizer and switch to it
-      await this.multiDatasetVisualizer.addDataset(datasetInfo.id, datasetInfo.label, dataProvider);
-      await this.multiDatasetVisualizer.switchToDataset(datasetInfo.id);
+      await this.multiDatasetVisualizer.addDataset(datasetInfo.metadata, dataProvider);
+      await this.multiDatasetVisualizer.switchToDataset(datasetInfo.metadata.name);
 
       // Mark as loaded
-      this.markDatasetAsLoaded(datasetInfo.id);
+      this.markDatasetAsLoaded(datasetInfo.metadata.name);
     } catch (error) {
-      console.error(`Failed to load dataset ${datasetInfo.id}:`, error);
+      console.error(`Failed to load dataset ${datasetInfo.metadata.name}:`, error);
     }
   }
 }

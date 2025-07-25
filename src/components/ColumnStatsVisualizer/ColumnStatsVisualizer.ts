@@ -1,5 +1,5 @@
 import { SpreadsheetVisualizer } from "../SpreadsheetVisualizer/SpreadsheetVisualizer";
-import { Column } from "../SpreadsheetVisualizer/types";
+import { Column } from "../../data/types";
 
 const BIN_NUMBER = 100;
 
@@ -21,7 +21,6 @@ export class ColumnStatsVisualizer {
   private stats: ColumnStats | null = null;
   private numbers: number[] = [];
   private numbersSorted: number[] = [];
-  private isLoading: boolean = false;
 
   constructor(parent: HTMLElement, spreadsheetVisualizer: SpreadsheetVisualizer | null, statsPanelWidth: number) {
     this.container = document.createElement("div");

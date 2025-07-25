@@ -10,9 +10,8 @@ export { DragDropZone } from "./components/DragDropZone";
 export { CellValueBar } from "./components/CellValueBar";
 
 // Data types and utilities
-export type { CdiscDataset, CdiscColumn } from "./data/types";
+export type { DataProvider } from "./data/types";
 export { getColumns } from "./data/types";
-export { CdiscDataProvider } from "./data/providers/CdiscDataProvider";
 
 // New component types
 export type { BrianAppOptions } from "./components/BrianApp";
@@ -23,10 +22,10 @@ export type { CellValueBarOptions, CellInfo } from "./components/CellValueBar";
 
 // File parsing utilities
 export { parseFile, isSupportedFileType, getSupportedFileTypes } from "./data/fileParser";
-export type { ParseOptions, ParseResult } from "./data/fileParser";
+export type { ParseOptions } from "./data/fileParser";
 
 // SpreadsheetVisualizer types
-export type { SpreadsheetOptions, DataProvider, Column, DatasetMetadata } from "./components/SpreadsheetVisualizer/types";
+export type { SpreadsheetOptions } from "./components/SpreadsheetVisualizer/types";
 
 // Import styles
 import "./styles/main.scss";

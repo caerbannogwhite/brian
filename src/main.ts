@@ -2,6 +2,7 @@ import "./styles/main.scss";
 import { datasetDm, datasetDmMini, datasetDmShort, datasetAe } from "./data.ts";
 import { BrianApp } from "./components/BrianApp";
 import { type CdiscDataset } from "./data/types";
+import { CdiscDataProvider } from "./data/providers/CdiscDataProvider.ts";
 
 // Initialize the Brian application with VS Code-like interface
 async function initApplication() {
@@ -13,7 +14,9 @@ async function initApplication() {
   // Create the Brian application
   const brianApp = new BrianApp(appContainer, {
     theme: "auto", // Automatically detect user's preferred theme
-    showDatasetPanel: true,
+    // theme: "light",
+    showLeftPanel: true,
+    showDragDropZone: true,
     statusBarVisible: true,
     commandPaletteEnabled: true,
     spreadsheetOptions: {
@@ -31,10 +34,10 @@ async function initApplication() {
 
   if (loadSampleData) {
     try {
-      await brianApp.addDataset("dm", "Demographics", datasetDm as CdiscDataset);
-      await brianApp.addDataset("dmMini", "Demographics Mini", datasetDmMini as CdiscDataset);
-      await brianApp.addDataset("dmShort", "Demographics Short", datasetDmShort as CdiscDataset);
-      await brianApp.addDataset("ae", "Adverse Events", datasetAe as CdiscDataset);
+      await brianApp.addDataset(new CdiscDataProvider(datasetDm as CdiscDataset));
+      await brianApp.addDataset(new CdiscDataProvider(datasetDmMini as CdiscDataset));
+      await brianApp.addDataset(new CdiscDataProvider(datasetDmShort as CdiscDataset));
+      await brianApp.addDataset(new CdiscDataProvider(datasetAe as CdiscDataset));
 
       brianApp.showMessage("Sample datasets loaded successfully", "info");
     } catch (error) {

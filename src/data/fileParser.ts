@@ -1,4 +1,5 @@
-import { CdiscDataset, CdiscColumn } from "./types";
+import { DefaultDataProvider } from "./providers/DefaultDataProvider";
+import { Column, DatasetMetadata, DataType, DataProvider } from "./types";
 
 export interface ParseOptions {
   delimiter?: string;
@@ -6,19 +7,10 @@ export interface ParseOptions {
   fileName?: string;
 }
 
-export interface ParseResult {
-  dataset: CdiscDataset;
-  parseInfo: {
-    rowCount: number;
-    columnCount: number;
-    fileName: string;
-  };
-}
-
 /**
- * Parse a CSV/TSV file and convert it to CdiscDataset format
+ * Parse a CSV/TSV file and convert it to DatasetMetadata format
  */
-export async function parseFile(file: File, options: ParseOptions = {}): Promise<ParseResult> {
+export async function parseFile(file: File, options: ParseOptions = {}): Promise<DataProvider> {
   const { delimiter, hasHeader = true, fileName } = options;
 
   // Read file content
@@ -34,41 +26,19 @@ export async function parseFile(file: File, options: ParseOptions = {}): Promise
   const columns = inferColumns(headers, rows);
 
   // Generate dataset metadata
-  const now = new Date().toISOString();
+  // const now = new Date().toISOString();
   const datasetName = (fileName || file.name).replace(/\.[^/.]+$/, "").toUpperCase();
 
-  const dataset: CdiscDataset = {
-    datasetJSONCreationDateTime: now,
-    datasetJSONVersion: "1.0.0",
-    fileOID: generateFileOID(datasetName),
-    dbLastModifiedDateTime: now,
-    originator: "Brian File Parser",
-    sourceSystem: {
-      name: "Brian",
-      version: "0.3.0",
-    },
-    studyOID: "STUDY_IMPORTED",
-    metaDataVersionOID: "MDV_IMPORTED",
-    metaDataRef: "metadata_imported.json",
-    itemGroupOID: `IG.${datasetName}`,
-    records: rows.length,
+  const dataset: DatasetMetadata = {
     name: datasetName,
-    label: datasetName
-      .toLowerCase()
-      .replace(/[_-]/g, " ")
-      .replace(/\b\w/g, (l) => l.toUpperCase()),
+    fileName: file.name,
+    description: "Imported from file",
+    totalRows: rows.length,
+    totalColumns: columns.length,
     columns,
-    rows,
   };
 
-  return {
-    dataset,
-    parseInfo: {
-      rowCount: rows.length,
-      columnCount: columns.length,
-      fileName: file.name,
-    },
-  };
+  return new DefaultDataProvider(file.name, dataset.totalRows, dataset.totalColumns, columns, rows);
 }
 
 /**
@@ -180,24 +150,24 @@ function parseCSVLine(line: string, delimiter: string): string[] {
 }
 
 /**
- * Infer column types and create CdiscColumn definitions
+ * Infer column types
  */
-function inferColumns(headers: string[], rows: any[][]): CdiscColumn[] {
+function inferColumns(headers: string[], rows: any[][]): Column[] {
   return headers.map((header, index) => {
     const values = rows.map((row) => row[index]).filter((val) => val !== null && val !== undefined && val !== "");
     const dataType = inferDataType(values);
     const maxLength = Math.max(...values.map((val) => String(val || "").length));
 
     return {
-      itemOID: `${header.toUpperCase()}.${header.toUpperCase()}`,
       name: header.toUpperCase(),
+      key: header.toUpperCase(),
       label: header
         .toLowerCase()
         .replace(/[_-]/g, " ")
         .replace(/\b\w/g, (l) => l.toUpperCase()),
       dataType,
       length: Math.max(maxLength, 8),
-      keySequence: index === 0 ? 1 : undefined, // Make first column a key
+      format: undefined,
     };
   });
 }
@@ -205,7 +175,7 @@ function inferColumns(headers: string[], rows: any[][]): CdiscColumn[] {
 /**
  * Infer data type from sample values
  */
-function inferDataType(values: any[]): string {
+function inferDataType(values: any[]): DataType {
   if (values.length === 0) return "string";
 
   // Sample first 100 values for performance
@@ -238,7 +208,7 @@ function inferDataType(values: any[]): string {
   const threshold = 0.8; // 80% threshold
 
   if (numericCount / total >= threshold) {
-    return Number.isInteger(Number(sample[0])) ? "integer" : "decimal";
+    return Number.isInteger(Number(sample[0])) ? "integer" : "float";
   }
 
   if (dateCount / total >= threshold) {
@@ -273,14 +243,6 @@ function hasTimeComponent(values: any[]): boolean {
     }
   }
   return false;
-}
-
-/**
- * Generate a unique file OID
- */
-function generateFileOID(name: string): string {
-  const timestamp = Date.now();
-  return `FILE.${name}.${timestamp}`;
 }
 
 /**

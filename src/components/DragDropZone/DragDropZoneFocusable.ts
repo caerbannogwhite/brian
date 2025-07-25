@@ -1,5 +1,5 @@
 import { FocusableComponent } from "../BrianApp/types";
-import { DragDropZone } from "./DragDropZone";
+import { DragDropZone, DragDropZoneOptions } from "./DragDropZone";
 
 export class DragDropZoneFocusable extends DragDropZone implements FocusableComponent {
   private _isFocused: boolean = false;
@@ -8,8 +8,8 @@ export class DragDropZoneFocusable extends DragDropZone implements FocusableComp
   public readonly canReceiveFocus: boolean = true;
   public readonly focusableElement: HTMLElement;
 
-  constructor(parent: HTMLElement) {
-    super(parent);
+  constructor(parent: HTMLElement, options: DragDropZoneOptions = {}) {
+    super(parent, options);
     this.focusableElement = this.getContainer();
     this._isFocused = false;
   }

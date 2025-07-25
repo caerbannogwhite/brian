@@ -3,30 +3,34 @@ import { DatasetPanel } from "../DatasetPanel";
 import { StatusBar } from "../StatusBar";
 import { CommandPalette } from "../CommandPalette/CommandPalette";
 import { SpreadsheetOptions } from "../SpreadsheetVisualizer/types";
-import { CdiscDataset } from "../../data/types";
-import { CdiscDataProvider } from "../../data/providers/CdiscDataProvider";
+import { DataProvider } from "../../data/types";
 import { FocusManager } from "./FocusManager";
 import { EventDispatcher } from "./EventDispatcher";
 import { EventHandler } from "./types";
+import { DragDropZoneFocusable } from "../DragDropZone/DragDropZoneFocusable";
 
 export interface BrianAppOptions {
   spreadsheetOptions?: SpreadsheetOptions;
   theme?: "light" | "dark" | "auto";
-  showDatasetPanel?: boolean;
+  showLeftPanel?: boolean;
   statusBarVisible?: boolean;
   commandPaletteEnabled?: boolean;
+  showDragDropZone?: boolean;
   debugMode?: boolean;
 }
 
 export class BrianApp implements EventHandler {
   private container: HTMLElement;
-  private statusBar!: StatusBar;
-  private commandPalette!: CommandPalette;
   private mainContainer!: HTMLElement;
-  private datasetPanelContainer!: HTMLElement;
+  private leftPanelContainer!: HTMLElement;
   private spreadsheetContainer!: HTMLElement;
+
+  private commandPalette!: CommandPalette;
+  private leftPanel!: DatasetPanel;
+  private dragDropZone!: DragDropZoneFocusable | null;
   private multiDatasetVisualizer!: MultiDatasetVisualizer;
-  private datasetPanel!: DatasetPanel;
+  private statusBar!: StatusBar;
+
   private options: BrianAppOptions;
   private theme: "light" | "dark" = "dark";
 
@@ -37,7 +41,7 @@ export class BrianApp implements EventHandler {
   constructor(parent: HTMLElement, options: BrianAppOptions = {}) {
     this.options = {
       theme: "dark",
-      showDatasetPanel: true,
+      showLeftPanel: true,
       statusBarVisible: true,
       commandPaletteEnabled: true,
       ...options,
@@ -60,8 +64,8 @@ export class BrianApp implements EventHandler {
   }
 
   // Public API methods
-  public async addDataset(id: string, name: string, dataset: CdiscDataset): Promise<void> {
-    this.datasetPanel.addDataset(id, id, name, dataset);
+  public async addDataset(dataset: DataProvider): Promise<void> {
+    this.leftPanel.addDataset(dataset);
     this.updateStatusBarDatasetInfo();
     this.updateFocusAfterDatasetChange();
   }
@@ -96,27 +100,39 @@ export class BrianApp implements EventHandler {
 
     this.statusBar?.destroy();
     this.commandPalette?.destroy();
+    this.leftPanel?.destroy();
+    this.dragDropZone?.destroy();
+
     this.container.remove();
   }
 
   // EventHandler interface implementation
   public async handleKeyDown(e: KeyboardEvent): Promise<boolean> {
-    // Ctrl+Shift+P for command palette (if Ctrl+P is taken by browser)
-    if (e.ctrlKey && e.shiftKey && e.key === "P") {
-      e.preventDefault();
+    switch (e.key) {
+      //@ts-ignore
+      case "b":
+        if (e.ctrlKey) {
+          e.preventDefault();
+          this.toggleDatasetPanel();
+          return true;
+        }
 
-      this.commandPalette?.show();
-      return true;
+      //@ts-ignore
+      case "P":
+        if (e.ctrlKey && e.shiftKey) {
+          e.preventDefault();
+          this.commandPalette?.show();
+          return true;
+        }
+
+      case "F11":
+        e.preventDefault();
+        this.toggleFullscreen();
+        return true;
+
+      default:
+        return false;
     }
-
-    // F11 for fullscreen
-    if (e.key === "F11") {
-      e.preventDefault();
-      this.toggleFullscreen();
-      return true;
-    }
-
-    return false;
   }
 
   public async handleResize(_e: Event): Promise<boolean> {
@@ -130,15 +146,16 @@ export class BrianApp implements EventHandler {
     this.mainContainer.className = "brian-app__main";
 
     // Dataset panel container
-    this.datasetPanelContainer = document.createElement("div");
-    this.datasetPanelContainer.className = "brian-app__dataset-panel";
+    this.leftPanelContainer = document.createElement("div");
+    this.leftPanelContainer.className = "brian-app__dataset-panel";
 
     // Spreadsheet container
     this.spreadsheetContainer = document.createElement("div");
     this.spreadsheetContainer.className = "brian-app__spreadsheet";
 
-    this.mainContainer.appendChild(this.datasetPanelContainer);
+    this.mainContainer.appendChild(this.leftPanelContainer);
     this.mainContainer.appendChild(this.spreadsheetContainer);
+
     this.container.appendChild(this.mainContainer);
   }
 
@@ -154,6 +171,12 @@ export class BrianApp implements EventHandler {
       this.commandPalette = new CommandPalette(this.container);
     }
 
+    // Drag drop zone
+    if (this.options.showDragDropZone) {
+      this.dragDropZone = new DragDropZoneFocusable(this.container);
+      this.setOnFileDroppedCallback();
+    }
+
     // Calculate dimensions
     this.updateDimensions();
 
@@ -162,13 +185,15 @@ export class BrianApp implements EventHandler {
 
     // Set event dispatcher on multi-dataset visualizer
     this.multiDatasetVisualizer.setEventDispatcher(this.eventDispatcher);
+    this.setOnCloseTabCallback();
 
     // Dataset panel
-    if (this.options.showDatasetPanel) {
-      this.datasetPanel = new DatasetPanel(this.datasetPanelContainer, this.multiDatasetVisualizer);
+    if (this.options.showLeftPanel) {
+      this.leftPanel = new DatasetPanel(this.leftPanelContainer, this.multiDatasetVisualizer);
+      this.setOnSelectDatasetCallback();
 
       // Handle panel toggle
-      this.datasetPanel.setOnToggleCallback((isMinimized) => {
+      this.leftPanel.setOnToggleCallback((isMinimized) => {
         this.container.classList.toggle("brian-app--panel-minimized", isMinimized);
         this.updateDimensions();
       });
@@ -176,9 +201,6 @@ export class BrianApp implements EventHandler {
 
     // Listen for dataset changes
     this.setupDatasetListeners();
-
-    // Setup file drop handling
-    this.setupFileDropHandling();
   }
 
   private setupTheme(): void {
@@ -210,7 +232,7 @@ export class BrianApp implements EventHandler {
     const windowWidth = window.innerWidth;
     const windowHeight = window.innerHeight;
     const statusBarHeight = this.options.statusBarVisible ? 22 : 0;
-    const panelWidth = this.options.showDatasetPanel ? (this.datasetPanel?.getIsMinimized() ? 48 : 280) : 0;
+    const panelWidth = this.options.showLeftPanel ? (this.leftPanel?.getIsMinimized() ? 48 : 280) : 0;
 
     // Update main container
     this.mainContainer.style.height = `${windowHeight - statusBarHeight}px`;
@@ -232,7 +254,7 @@ export class BrianApp implements EventHandler {
     const originalCloseDataset = this.multiDatasetVisualizer.closeDataset.bind(this.multiDatasetVisualizer);
     this.multiDatasetVisualizer.closeDataset = (id: string) => {
       originalCloseDataset(id);
-      this.datasetPanel?.markDatasetAsUnloaded(id);
+      this.leftPanel?.markDatasetAsUnloaded(id);
       this.updateStatusBarDatasetInfo();
       this.updateFocusAfterDatasetChange();
     };
@@ -316,7 +338,7 @@ export class BrianApp implements EventHandler {
   }
 
   private toggleDatasetPanel(): void {
-    this.datasetPanel.toggleMinimize();
+    this.leftPanel.toggleMinimize();
   }
 
   private toggleTheme(): void {
@@ -354,7 +376,7 @@ export class BrianApp implements EventHandler {
     Brian Application Info:
     - Active datasets: ${datasetIds.length}
     - Theme: ${this.theme}
-    - Dataset panel: ${this.options.showDatasetPanel ? "visible" : "hidden"}
+    - Dataset panel: ${this.options.showLeftPanel ? "visible" : "hidden"}
     - Status bar: ${this.options.statusBarVisible ? "visible" : "hidden"}
     - Command palette: ${this.options.commandPaletteEnabled ? "enabled" : "disabled"}
     `.trim();
@@ -371,31 +393,68 @@ export class BrianApp implements EventHandler {
     }
   }
 
-  private setupFileDropHandling(): void {
-    this.multiDatasetVisualizer.setOnFileDroppedCallback(async (dataset: CdiscDataset, fileName: string) => {
+  /**
+   * Set the callback for when a file is dropped.
+   * Add the dataset to the dataset panel and visualizer.
+   * Mark the dataset as loaded in the panel.
+   * Update the status bar.
+   */
+  private setOnFileDroppedCallback(): void {
+    this.dragDropZone?.setOnFileDroppedCallback(async (dataset: DataProvider): Promise<void> => {
       try {
-        // Generate a unique ID for the dataset
-        const datasetId = dataset.name.toLowerCase();
+        const metadata = await dataset.getMetadata();
 
-        // Add to dataset panel first
-        this.datasetPanel.addDataset(datasetId, datasetId, dataset.label || dataset.name, dataset);
+        // Add to dataset panel
+        this.addDataset(dataset);
 
         // Create data provider and add to visualizer
-        const dataProvider = new CdiscDataProvider(dataset);
-        await this.multiDatasetVisualizer.addDataset(datasetId, dataset.label || dataset.name, dataProvider);
+        await this.multiDatasetVisualizer.addDataset(metadata, dataset);
 
         // Mark as loaded in panel
-        this.datasetPanel.markDatasetAsLoaded(datasetId);
+        this.leftPanel.markDatasetAsLoaded(metadata.name);
 
         // Update status bar
         this.updateStatusBarDatasetInfo();
 
         // Show success message
-        this.showMessage(`Dataset "${fileName}" loaded successfully`, "info");
+        this.showMessage(`Dataset "${metadata.name}" loaded successfully`, "info");
+        this.dragDropZone?.destroy();
+        this.dragDropZone = null;
       } catch (error) {
         console.error("Error adding dropped dataset:", error);
         const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
         this.showMessage(`Failed to load dataset: ${errorMessage}`, "error");
+      }
+    });
+  }
+
+  /**
+   * Set the callback for when a dataset is selected.
+   * Destroy the drag drop zone.
+   */
+  private setOnSelectDatasetCallback(): void {
+    this.leftPanel.setOnSelectCallback((_dataset: DataProvider) => {
+      this.dragDropZone?.destroy();
+      this.dragDropZone = null;
+    });
+  }
+
+  /**
+   * Set the callback for when a tab is closed.
+   * If there are no datasets left, show the drag drop zone.
+   */
+  private setOnCloseTabCallback(): void {
+    this.multiDatasetVisualizer.setOnCloseTabCallback(() => {
+      this.updateStatusBarDatasetInfo();
+      this.updateFocusAfterDatasetChange();
+
+      if (this.multiDatasetVisualizer.getDatasetIds().length === 0) {
+        this.showMessage("No datasets loaded", "info");
+
+        if (this.dragDropZone === null) {
+          this.dragDropZone = new DragDropZoneFocusable(this.container);
+          this.setOnFileDroppedCallback();
+        }
       }
     });
   }

@@ -1,5 +1,4 @@
-import { DataProvider, DatasetMetadata } from "../../components/SpreadsheetVisualizer/types";
-import { CdiscDataset, getColumns } from "../types";
+import { CdiscDataset, DatasetMetadata, DataProvider, getColumns } from "../types";
 
 export class CdiscDataProvider implements DataProvider {
   private dataset: CdiscDataset;
@@ -19,8 +18,8 @@ export class CdiscDataProvider implements DataProvider {
 
   async fetchData(startRow: number, endRow: number, startCol: number, endCol: number): Promise<any[][]> {
     // Simulate network delay
-    const randomDelay = Math.random() * 10;
-    await new Promise((resolve) => setTimeout(resolve, 100 - randomDelay));
+    // const randomDelay = Math.random() * 10;
+    // await new Promise((resolve) => setTimeout(resolve, 100 - randomDelay));
 
     return this.dataset.rows.slice(startRow, endRow + 1).map((row: any[]) => row.slice(startCol, endCol + 1));
   }
