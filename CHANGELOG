@@ -3,6 +3,7 @@ v0.4.0:
  - [Feature] Added drag and drop support for file upload
  - [Feature] Addes Status Bar
  - [Feature] Added Cell Value Bar
+ - [Feature] Added values distribution visualization in the stats panel
  - [Enhanced] Cell styling and formatting
  - [Enhanced] Zooming added
  - [Enhanced] New event handling system
