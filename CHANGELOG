@@ -1,4 +1,4 @@
-v0.4.0:
+v0.4.0-halt:
  - [Feature] Added Command Palette for improved interactivity
  - [Feature] Added drag and drop support for file upload
  - [Feature] Addes Status Bar
