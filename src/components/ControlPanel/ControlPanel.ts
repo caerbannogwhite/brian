@@ -7,6 +7,7 @@ import { FileTreeNode, detectFileType } from "../../data/FileTreeTypes";
 import type { FileSource, FileSourceFile, FileSourceFolder } from "../../data/files/FileSource";
 import { MultipleHtmlTablesError } from "../../data/formats/htmlTables";
 import { environmentService } from "../../data/environments/EnvironmentService";
+import { resolveTableName } from "../../data/tableNames";
 import { HtmlPasteDialog } from "../HtmlPasteDialog/HtmlPasteDialog";
 import { FileTreeRenderer, FileTreeCallbacks } from "./FileTreeRenderer";
 import { TabManager } from "../TabManager/TabManager";
@@ -810,7 +811,21 @@ export class ControlPanel {
       this.renderTree();
       this.expandSection("datasets");
     }
+    const activeBefore = environmentService.getActiveId();
     this.bindFolderToEnvironment(tree, folderHandleId);
+
+    // If binding just switched the active environment, the onChange
+    // subscriber is already running applyActiveEnvironment. That call
+    // wipes the engine, clears this.fileTree (dropping the tree
+    // attached above), re-scans the folder from its stored handle, and
+    // re-enters this method with the environment active. That re-entry
+    // runs the batch, so importing here as well would import every
+    // file twice. Only skip when a stored handle exists. Without one
+    // (the webkitdirectory fallback) there is no re-scan, so the
+    // import must happen here.
+    if (folderHandleId && environmentService.getActiveId() !== activeBefore) {
+      return;
+    }
 
     // Auto-import small files in the folder. Fire-and-forget — the
     // tree is already visible, so a slow import doesn't block the
@@ -1235,8 +1250,9 @@ export class ControlPanel {
           node.kind === "sheet" && node.sheetName
             ? `${node.alias || stripExt(node.filePath.split(/[\\/]/).pop() || node.name)}__${node.sheetName}`
             : node.alias || stripExt(node.name);
+        const tableName = node.tableName ?? resolveTableName(baseName, await this.takenTableNames());
         const sheet = node.kind === "sheet" ? node.sheetName : undefined;
-        const result = await this.fileImportService.importPath(node.filePath, baseName, sheet);
+        const result = await this.fileImportService.importPath(node.filePath, tableName, sheet);
         const metadata = await result.getMetadata();
         node.isImported = true;
         node.tableName = metadata.name;
@@ -1270,7 +1286,10 @@ export class ControlPanel {
         node.kind === "sheet" && node.sheetName
           ? `${node.alias || stripExt((node.fileHandle as any)?.name || node.name)}__${node.sheetName}`
           : node.alias || stripExt(node.name);
-      const tableName = baseName;
+      // A node that was imported before keeps its name, so a re-import
+      // replaces the same table. A new node whose name is taken gets a
+      // numbered suffix instead of replacing someone else's table.
+      const tableName = node.tableName ?? resolveTableName(baseName, await this.takenTableNames());
       const importOpts = node.kind === "sheet" && node.sheetName ? { sheetName: node.sheetName } : undefined;
 
       let provider;
@@ -1356,6 +1375,27 @@ export class ControlPanel {
 
       return { ok: false, error: formatted };
     }
+  }
+
+  /**
+   * Table names a new import must not claim: everything the panel has
+   * imported plus the engine catalog. The catalog part also covers
+   * names the panel does not track, such as tables the user created
+   * in SQL, which a file import would otherwise replace. If the
+   * catalog cannot be listed, the tracked datasets still guard
+   * collisions inside a batch.
+   */
+  private async takenTableNames(): Promise<string[]> {
+    const taken = this.datasets.map((d) => d.metadata.name);
+    const backend = this.tabManager.getBackend();
+    if (backend) {
+      try {
+        taken.push(...(await backend.listTables()));
+      } catch (err) {
+        console.warn("takenTableNames: listTables failed; checking tracked datasets only", err);
+      }
+    }
+    return taken;
   }
 
   private async handleTreeNodeExpand(node: FileTreeNode): Promise<void> {
