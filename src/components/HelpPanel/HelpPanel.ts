@@ -46,6 +46,9 @@ export interface HelpPanelOptions {
   setCopyOptions?: (opts: { delimiter: "tab" | "comma"; includeHeader: boolean; quoteEscape: "double" | "backslash" }) => void;
   getFormatOptions?: () => FormatPrefs;
   setFormatOptions?: (opts: FormatPrefs) => void;
+  /** Settings → Startup: open the Help panel on every app start. */
+  getShowHelpOnStartup?: () => boolean;
+  setShowHelpOnStartup?: (value: boolean) => void;
   /** Recent folders shortcut list (FSA-API-only browsers). Empty array
    *  hides the section in the Import tab. */
   getRecentFolders?: () => Array<{ id: string; name: string }>;
@@ -947,6 +950,26 @@ export class HelpPanel {
       section.appendChild(this.buildLabeledRow("Max chars per cell",
         this.buildSegmented(MAX_STRING_LENGTH_PRESETS, initialMaxLen, (n) => (n === 0 ? "None" : String(n)), (n) => updateFormat("maxStringLength", n)),
       ));
+    }));
+
+    // --- Startup ---
+    body.appendChild(this.buildSettingsSection("Startup", (section) => {
+      const row = document.createElement("label");
+      row.className = "help-panel__settings-row help-panel__settings-row--checkbox";
+      const cb = document.createElement("input");
+      cb.type = "checkbox";
+      cb.checked = this.options.getShowHelpOnStartup?.() ?? false;
+      cb.addEventListener("change", () => this.options.setShowHelpOnStartup?.(cb.checked));
+      const cbLabel = document.createElement("span");
+      cbLabel.textContent = "Show Help at startup";
+      row.appendChild(cb);
+      row.appendChild(cbLabel);
+      section.appendChild(row);
+
+      const hint = document.createElement("p");
+      hint.className = "help-panel__hint";
+      hint.textContent = "Off: the app starts clean. The first visit still opens the How-To introduction once.";
+      section.appendChild(hint);
     }));
 
     // --- Import ---

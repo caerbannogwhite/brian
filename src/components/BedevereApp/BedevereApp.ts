@@ -57,6 +57,7 @@ import { FilteredDuckDBDataProvider } from "@/data/FilteredDuckDBDataProvider";
 import { HideColumnsDialog } from "../HideColumnsDialog/HideColumnsDialog";
 import { EmbedBuilderDialog } from "../EmbedBuilderDialog/EmbedBuilderDialog";
 import { shouldShowDesktopHint, renderDesktopHint } from "./desktopHint";
+import { startupHelpTab } from "./startupHelp";
 import { DESKTOP_DOWNLOAD_URL } from "../../appLinks";
 
 // Pre-filled SQL for the /demo route — see runDemo(). Kept verbatim from
@@ -298,13 +299,13 @@ export class BedevereApp implements EventHandler {
     const path = window.location.pathname.replace(/\/$/, "");
     if (path === "/demo") {
       await this.runDemo();
-    } else if (!settings.hasSeenOnboarding) {
-      this.helpPanel.show("howto");
-      settings.hasSeenOnboarding = true;
-      this.persistenceService.saveAppSettings(settings);
     } else {
-      this.helpPanel.show("import");
-      if (shouldShowDesktopHint(settings, this.backend.id)) {
+      const startupTab = startupHelpTab(settings);
+      if (startupTab) this.helpPanel.show(startupTab);
+      if (!settings.hasSeenOnboarding) {
+        settings.hasSeenOnboarding = true;
+        this.persistenceService.saveAppSettings(settings);
+      } else if (shouldShowDesktopHint(settings, this.backend.id)) {
         renderDesktopHint(this.container, DESKTOP_DOWNLOAD_URL, () => {
           const s = this.persistenceService.loadAppSettings();
           s.hasSeenDesktopHint = true;
@@ -462,6 +463,12 @@ export class BedevereApp implements EventHandler {
         s.copyDelimiter = opts.delimiter;
         s.copyIncludeHeader = opts.includeHeader;
         s.csvQuoteEscape = opts.quoteEscape;
+        this.persistenceService.saveAppSettings(s);
+      },
+      getShowHelpOnStartup: () => this.persistenceService.loadAppSettings().showHelpOnStartup ?? false,
+      setShowHelpOnStartup: (value) => {
+        const s = this.persistenceService.loadAppSettings();
+        s.showHelpOnStartup = value;
         this.persistenceService.saveAppSettings(s);
       },
       getFormatOptions: () => {

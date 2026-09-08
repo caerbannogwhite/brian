@@ -20,6 +20,11 @@ export interface AppSettings {
   hasSeenOnboarding?: boolean;
   /** Set once the one-time "get the desktop app" hint has been shown. */
   hasSeenDesktopHint?: boolean;
+  /**
+   * Open the Help panel (Import tab) on every startup. Off by default
+   * since 0.16; the first-visit How-To onboarding shows regardless.
+   */
+  showHelpOnStartup?: boolean;
   copyDelimiter?: "tab" | "comma";
   copyIncludeHeader?: boolean;
   /**
