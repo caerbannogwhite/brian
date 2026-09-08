@@ -31,6 +31,9 @@ const DUCKDB_VERSION = "v1.4.3";
 // customRepository is set), so they don't need staging here.
 const required = [
   [`dist/extensions/stats-duck/${DUCKDB_VERSION}/wasm_eh/stats_duck.duckdb_extension.wasm`, 100_000],
+  // Standalone pages — a dropped rollup input would ship broken routes.
+  ["dist/about.html", 500],
+  ["dist/howto.html", 500],
 ];
 
 const failures = [];
@@ -46,7 +49,7 @@ for (const [path, minSize] of required) {
 }
 
 if (failures.length > 0) {
-  console.error("\nbuild verification FAILED — production VISUALIZE would be broken:");
+  console.error("\nbuild verification FAILED — required build outputs missing or too small:");
   for (const f of failures) console.error(`  - ${f}`);
   console.error(
     "\nCheck public/extensions/stats-duck/ has the wasm_eh build for this\n" +
@@ -56,4 +59,4 @@ if (failures.length > 0) {
   process.exit(1);
 }
 
-console.log(`build verification passed: ${required.length} stats-duck wasm files present`);
+console.log(`build verification passed: ${required.length} required outputs present`);

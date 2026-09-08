@@ -44,6 +44,10 @@ export default defineConfig(({ command }) => {
           // src/embed/main.ts). MPA shape — its own bundle so the
           // main app's tabs/env/help-panel code doesn't ride along.
           embed: resolve(__dirname, "embed.html"),
+          // Standalone, indexable pages serving the Help panel's About
+          // and How-To content outside the app.
+          about: resolve(__dirname, "about.html"),
+          howto: resolve(__dirname, "howto.html"),
         },
       },
     },
